@@ -1,0 +1,17 @@
+# Build & Dependency Artifacts
+bin/
+obj/
+node_modules/
+build/
+dist/
+__pycache__/
+*.pyc
+
+# Local Environment & Secrets
+.dotnet_home/
+.env
+*.local
+
+# Logs & Database volumes
+*.log
+pgdata/

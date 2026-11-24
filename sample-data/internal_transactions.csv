@@ -1,0 +1,12 @@
+ReferenceId,TransactionDate,Amount,Currency,Type,Status,SourceSystem
+TXN_1001,2026-11-20,125.50,USD,Payment,Completed,Internal
+TXN_1002,2026-11-20,450.00,USD,Payment,Completed,Internal
+TXN_1003,2026-11-21,980.25,USD,Payment,Completed,Internal
+TXN_1004,2026-11-21,1500.00,USD,Payment,Completed,Internal
+TXN_1005,2026-11-21,500.00,USD,Payment,Completed,Internal
+TXN_1006,2026-11-22,350.00,USD,Payment,Completed,Internal
+TXN_1006,2026-11-22,350.00,USD,Payment,Completed,Internal
+TXN_1007,2026-11-22,1200.00,USD,Payment,Completed,Internal
+TXN_1008,2026-11-22,48500.00,USD,Payment,Completed,Internal
+TXN_1009,2026-11-22,75.00,USD,Refund,Completed,Internal
+TXN_1010,2026-11-23,2400.00,USD,Payment,Completed,Internal

@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lendguard-postgres
+    environment:
+      POSTGRES_USER: lendguard
+      POSTGRES_PASSWORD: lendguardpwd
+      POSTGRES_DB: lendguarddb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lendguard -d lendguarddb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lendguard-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Database=lendguarddb;Username=lendguard;Password=lendguardpwd"
+      ASPNETCORE_URLS: "http://+:80"
+      ASPNETCORE_ENVIRONMENT: "Development"
+      AIService__BaseUrl: "http://ai:8000"
+    ports:
+      - "5000:80"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: lendguard-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Database=lendguarddb;Username=lendguard;Password=lendguardpwd"
+      AIService__BaseUrl: "http://ai:8000"
+    restart: unless-stopped
+
+  ai:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: lendguard-ai
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lendguard-frontend
+    depends_on:
+      - api
+      - ai
+    ports:
+      - "80:80"
+      - "3000:80"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

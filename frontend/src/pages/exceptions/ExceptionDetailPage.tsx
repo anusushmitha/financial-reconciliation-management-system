@@ -763,7 +763,7 @@ export const ExceptionDetailPage: React.FC = () => {
 
       {/* Prescriptive Double-Entry Accounting Journal Suggestion */}
       {(() => {
-        const currency = exception.currency || 'USD';
+        const currency = exception.currency || 'INR';
         const expAmt = Number(exception.expectedAmount || 0);
         const actAmt = Number(exception.actualAmount || 0);
         const diffAmt = Number(exception.discrepancyAmount || (actAmt - expAmt));

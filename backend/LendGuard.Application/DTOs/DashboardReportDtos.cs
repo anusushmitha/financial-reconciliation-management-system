@@ -34,6 +34,7 @@ public class ReconciliationReportTotals
     public int InternalTransactions { get; set; }
     public int ExternalTransactions { get; set; }
     public int Matched { get; set; }
+    public int MatchedTransactions { get; set; }
     public int Exceptions { get; set; }
 }
 

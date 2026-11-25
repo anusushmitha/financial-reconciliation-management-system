@@ -46,8 +46,8 @@ public class AuditLogService : IAuditLogService
             query = query.Where(a => a.EntityType == entityType.Trim().ToUpper());
         }
 
-        if (from.HasValue) query = query.Where(a => a.CreatedAt >= from.Value);
-        if (to.HasValue) query = query.Where(a => a.CreatedAt <= to.Value);
+        if (from.HasValue) { var utcFrom = from.Value.ToUniversalTime(); query = query.Where(a => a.CreatedAt >= utcFrom); }
+        if (to.HasValue) { var utcTo = to.Value.ToUniversalTime(); query = query.Where(a => a.CreatedAt <= utcTo); }
 
         var total = await query.CountAsync(cancellationToken);
         var logs = await query.OrderByDescending(a => a.CreatedAt)

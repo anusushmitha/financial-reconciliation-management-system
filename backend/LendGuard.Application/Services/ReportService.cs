@@ -37,8 +37,8 @@ public class ReportService : IReportService
     {
         var query = _context.ReconciliationRuns.AsNoTracking().AsQueryable();
 
-        if (dateFrom.HasValue) query = query.Where(r => r.StartedAt >= dateFrom.Value);
-        if (dateTo.HasValue) query = query.Where(r => r.StartedAt <= dateTo.Value);
+        if (dateFrom.HasValue) { var utcFrom = dateFrom.Value.ToUniversalTime(); query = query.Where(r => r.StartedAt >= utcFrom); }
+        if (dateTo.HasValue) { var utcTo = dateTo.Value.ToUniversalTime(); query = query.Where(r => r.StartedAt <= utcTo); }
         if (!string.IsNullOrWhiteSpace(status)) query = query.Where(r => r.Status == status.Trim().ToUpper());
 
         var runs = await query.ToListAsync(cancellationToken);
@@ -48,8 +48,18 @@ public class ReportService : IReportService
         int totalExternal = runs.Sum(r => r.TotalExternal);
         int matched = runs.Sum(r => r.MatchedCount);
         int exceptions = runs.Sum(r => r.ExceptionCount);
-        decimal matchRate = (totalInternal + totalExternal) > 0
-            ? Math.Round(((decimal)(matched * 2) / (totalInternal + totalExternal)) * 100m, 1)
+
+        var runIds = runs.Select(r => r.Id).ToList();
+        var actualMatchedTxns = await _context.ReconciliationMatchItems.AsNoTracking()
+            .Where(mi => mi.ReconciliationMatch != null && runIds.Contains(mi.ReconciliationMatch.ReconciliationRunId))
+            .Select(mi => mi.TransactionId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        int matchedTransactions = actualMatchedTxns > 0 ? actualMatchedTxns : matched * 2;
+        int totalTransactions = totalInternal + totalExternal;
+        decimal matchRate = totalTransactions > 0
+            ? Math.Round(((decimal)matchedTransactions / totalTransactions) * 100m, 1)
             : 0m;
 
         return new ReconciliationReportDto
@@ -66,6 +76,7 @@ public class ReportService : IReportService
                 InternalTransactions = totalInternal,
                 ExternalTransactions = totalExternal,
                 Matched = matched,
+                MatchedTransactions = matchedTransactions,
                 Exceptions = exceptions
             },
             MatchRate = matchRate
@@ -76,8 +87,8 @@ public class ReportService : IReportService
     {
         var query = _context.Exceptions.AsNoTracking().AsQueryable();
 
-        if (dateFrom.HasValue) query = query.Where(e => e.CreatedAt >= dateFrom.Value);
-        if (dateTo.HasValue) query = query.Where(e => e.CreatedAt <= dateTo.Value);
+        if (dateFrom.HasValue) { var utcFrom = dateFrom.Value.ToUniversalTime(); query = query.Where(e => e.CreatedAt >= utcFrom); }
+        if (dateTo.HasValue) { var utcTo = dateTo.Value.ToUniversalTime(); query = query.Where(e => e.CreatedAt <= utcTo); }
         if (!string.IsNullOrWhiteSpace(type)) query = query.Where(e => e.ExceptionType == type.Trim().ToUpper());
         if (!string.IsNullOrWhiteSpace(severity)) query = query.Where(e => e.Severity == severity.Trim().ToUpper());
         if (!string.IsNullOrWhiteSpace(status)) query = query.Where(e => e.Status == status.Trim().ToUpper());
@@ -116,8 +127,8 @@ public class ReportService : IReportService
     public async Task<byte[]> ExportReconciliationCsvAsync(DateTimeOffset? dateFrom, DateTimeOffset? dateTo, string? status, CancellationToken cancellationToken = default)
     {
         var query = _context.ReconciliationRuns.AsNoTracking().AsQueryable();
-        if (dateFrom.HasValue) query = query.Where(r => r.StartedAt >= dateFrom.Value);
-        if (dateTo.HasValue) query = query.Where(r => r.StartedAt <= dateTo.Value);
+        if (dateFrom.HasValue) { var utcFrom = dateFrom.Value.ToUniversalTime(); query = query.Where(r => r.StartedAt >= utcFrom); }
+        if (dateTo.HasValue) { var utcTo = dateTo.Value.ToUniversalTime(); query = query.Where(r => r.StartedAt <= utcTo); }
         if (!string.IsNullOrWhiteSpace(status)) query = query.Where(r => r.Status == status.Trim().ToUpper());
 
         var runs = await query.OrderByDescending(r => r.StartedAt).ToListAsync(cancellationToken);
@@ -156,8 +167,8 @@ public class ReportService : IReportService
     public async Task<byte[]> ExportExceptionsCsvAsync(DateTimeOffset? dateFrom, DateTimeOffset? dateTo, string? type, string? severity, string? status, CancellationToken cancellationToken = default)
     {
         var query = _context.Exceptions.AsNoTracking().AsQueryable();
-        if (dateFrom.HasValue) query = query.Where(e => e.CreatedAt >= dateFrom.Value);
-        if (dateTo.HasValue) query = query.Where(e => e.CreatedAt <= dateTo.Value);
+        if (dateFrom.HasValue) { var utcFrom = dateFrom.Value.ToUniversalTime(); query = query.Where(e => e.CreatedAt >= utcFrom); }
+        if (dateTo.HasValue) { var utcTo = dateTo.Value.ToUniversalTime(); query = query.Where(e => e.CreatedAt <= utcTo); }
         if (!string.IsNullOrWhiteSpace(type)) query = query.Where(e => e.ExceptionType == type.Trim().ToUpper());
         if (!string.IsNullOrWhiteSpace(severity)) query = query.Where(e => e.Severity == severity.Trim().ToUpper());
         if (!string.IsNullOrWhiteSpace(status)) query = query.Where(e => e.Status == status.Trim().ToUpper());

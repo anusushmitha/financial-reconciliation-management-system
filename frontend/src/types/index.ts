@@ -114,6 +114,7 @@ export interface MatchMember {
   transactionId: string;
   side: string;
   amountApplied: number;
+  currency?: string;
   transactionReference?: string;
 }
 
@@ -225,6 +226,7 @@ export interface ReconciliationReport {
     internalTransactions: number;
     externalTransactions: number;
     matched: number;
+    matchedTransactions?: number;
     exceptions: number;
   };
   matchRate: number;

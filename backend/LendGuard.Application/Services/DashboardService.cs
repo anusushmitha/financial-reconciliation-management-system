@@ -32,14 +32,16 @@ public class DashboardService : IDashboardService
 
         if (dateFrom.HasValue)
         {
-            txnQuery = txnQuery.Where(t => t.TransactionDate >= dateFrom.Value);
-            excQuery = excQuery.Where(e => e.CreatedAt >= dateFrom.Value);
+            var utcFrom = dateFrom.Value.ToUniversalTime();
+            txnQuery = txnQuery.Where(t => t.TransactionDate >= utcFrom);
+            excQuery = excQuery.Where(e => e.CreatedAt >= utcFrom);
         }
 
         if (dateTo.HasValue)
         {
-            txnQuery = txnQuery.Where(t => t.TransactionDate <= dateTo.Value);
-            excQuery = excQuery.Where(e => e.CreatedAt <= dateTo.Value);
+            var utcTo = dateTo.Value.ToUniversalTime();
+            txnQuery = txnQuery.Where(t => t.TransactionDate <= utcTo);
+            excQuery = excQuery.Where(e => e.CreatedAt <= utcTo);
         }
 
         // Role scoping for analyst
@@ -50,7 +52,7 @@ public class DashboardService : IDashboardService
 
         var totalTxns = await txnQuery.CountAsync(cancellationToken);
         var matchedTxns = await txnQuery.CountAsync(t => t.Status == TransactionStatus.Matched, cancellationToken);
-        var unmatchedTxns = await txnQuery.CountAsync(t => t.Status == TransactionStatus.Pending || t.Status == TransactionStatus.Unmatched, cancellationToken);
+        var unmatchedTxns = await txnQuery.CountAsync(t => t.Status != TransactionStatus.Matched, cancellationToken);
 
         var openExceptions = await excQuery.CountAsync(e => e.Status == ExceptionStatus.Open || e.Status == ExceptionStatus.InProgress, cancellationToken);
         var resolvedExceptions = await excQuery.CountAsync(e => e.Status == ExceptionStatus.Resolved, cancellationToken);
@@ -70,19 +72,29 @@ public class DashboardService : IDashboardService
 
     public async Task<DashboardTrendsDto> GetTrendsAsync(DateTimeOffset? dateFrom = null, DateTimeOffset? dateTo = null, string interval = "day", CancellationToken cancellationToken = default)
     {
-        var from = dateFrom ?? DateTimeOffset.UtcNow.AddDays(-14);
-        var to = dateTo ?? DateTimeOffset.UtcNow;
+        var from = (dateFrom ?? DateTimeOffset.UtcNow.AddDays(-14)).ToUniversalTime();
+        var to = (dateTo ?? DateTimeOffset.UtcNow).ToUniversalTime();
 
         var runs = await _context.ReconciliationRuns.AsNoTracking()
             .Where(r => r.StartedAt >= from && r.StartedAt <= to && r.Status == ReconciliationRunStatus.Completed)
             .OrderBy(r => r.StartedAt)
             .ToListAsync(cancellationToken);
 
+        var runIds = runs.Select(r => r.Id).ToList();
+        var matchItemsByRun = await _context.ReconciliationMatchItems.AsNoTracking()
+            .Where(mi => mi.ReconciliationMatch != null && runIds.Contains(mi.ReconciliationMatch.ReconciliationRunId))
+            .Select(mi => new { mi.ReconciliationMatch!.ReconciliationRunId, mi.TransactionId })
+            .ToListAsync(cancellationToken);
+
+        var matchedCountLookup = matchItemsByRun
+            .GroupBy(x => x.ReconciliationRunId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.TransactionId).Distinct().Count());
+
         var grouped = runs.GroupBy(r => r.StartedAt.ToString("yyyy-MM-dd"))
             .Select(g =>
             {
                 var tot = g.Sum(r => r.TotalInternal + r.TotalExternal);
-                var mat = g.Sum(r => r.MatchedCount * 2);
+                var mat = g.Sum(r => matchedCountLookup.TryGetValue(r.Id, out var c) && c > 0 ? c : r.MatchedCount * 2);
                 var exc = g.Sum(r => r.ExceptionCount);
                 var rate = tot > 0 ? Math.Round(((decimal)mat / tot) * 100m, 1) : 0m;
                 return new DashboardTrendItem
@@ -94,23 +106,6 @@ public class DashboardService : IDashboardService
                     MatchRate = rate
                 };
             }).ToList();
-
-        // If no runs exist in range yet, provide smooth historical trend data points
-        if (!grouped.Any())
-        {
-            for (int i = 6; i >= 0; i--)
-            {
-                var day = DateTimeOffset.UtcNow.AddDays(-i).ToString("yyyy-MM-dd");
-                grouped.Add(new DashboardTrendItem
-                {
-                    Period = day,
-                    Total = 1200 + (i * 20),
-                    Matched = 1100 + (i * 18),
-                    Exceptions = 100 + (i * 2),
-                    MatchRate = 91.6m
-                });
-            }
-        }
 
         return new DashboardTrendsDto
         {

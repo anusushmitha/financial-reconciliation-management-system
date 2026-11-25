@@ -89,3 +89,31 @@ def test_anomaly_feature_attributions_and_ensemble_metadata():
     assert "ensembleWeights" in data and len(data["ensembleWeights"]) > 0
     assert "signals" in data and isinstance(data["signals"], list)
     assert data["advisoryOnly"] is True
+
+
+def test_small_multicurrency_unmatched_calibrated_properly():
+    headers = {"X-Service-Key": settings.ai_service_key}
+    payload = {
+        "analysisId": "3fa85f64-5717-4562-b3fc-2c963f66afb0",
+        "exceptionId": "3fa85f64-5717-4562-b3fc-2c963f66afb1",
+        "transactionEvidence": {
+            "amount": "500.00",
+            "currency": "EUR",
+            "transactionDate": "2026-11-25T10:00:00Z",
+            "transactionType": "SETTLEMENT"
+        },
+        "featureContext": {
+            "amountDeviation": 500.00,
+            "expectedAmount": 0.00,
+            "actualAmount": 500.00,
+            "dateDifferenceDays": 0,
+            "exceptionType": "UNMATCHED_EXTERNAL",
+            "unmatchedSide": "INTERNAL"
+        }
+    }
+    response = client.post("/internal/v1/anomaly-detection", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["riskLevel"] in ("LOW", "MODERATE")
+    assert data["anomalyScore"] < 0.70
+    assert data["featureAttributions"][0]["rawMetric"] == "EUR 500.00"

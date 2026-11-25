@@ -201,7 +201,7 @@ export const DashboardPage: React.FC = () => {
             style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500 }}>Unmatched / Pending</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500 }}>Unmatched &amp; Exception</span>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#FFFBEB', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ArrowUpRight size={18} />
               </div>
@@ -210,7 +210,7 @@ export const DashboardPage: React.FC = () => {
               <AnimatedCounter value={summary.unmatchedTransactions} duration={800} />
             </div>
             <div style={{ fontSize: '12px', color: '#D97706' }}>
-              Awaiting reconciliation
+              Pending or flagged ledger rows
             </div>
           </SpotlightCard>
         </div>

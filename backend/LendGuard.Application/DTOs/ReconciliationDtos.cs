@@ -53,6 +53,7 @@ public class MatchMemberDto
     public Guid TransactionId { get; set; }
     public string Side { get; set; } = string.Empty;
     public decimal AmountApplied { get; set; }
+    public string Currency { get; set; } = "INR";
     public string? TransactionReference { get; set; }
 }
 

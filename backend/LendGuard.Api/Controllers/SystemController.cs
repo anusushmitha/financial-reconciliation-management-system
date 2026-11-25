@@ -161,86 +161,34 @@ public class SystemController : ApiControllerBase
     [Authorize(Roles = UserRole.Admin)]
     public async Task<IActionResult> ResetShowcaseDemo(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Admin requested showcase demonstration reset.");
+        _logger.LogInformation("Admin requested full mathematically consistent showcase demonstration reset.");
 
-        // 1. Fetch Key Users
-        var anu = await _context.Users.FirstOrDefaultAsync(u => u.Email == "sanushusmitha@gmail.com", cancellationToken);
-        var op = await _context.Users.FirstOrDefaultAsync(u => u.Email == "staging.analyst@lendguard.internal", cancellationToken);
+        var summary = await DatabaseSeeder.ResetShowcaseDatasetAsync(_context, _logger, CurrentUserId, cancellationToken);
 
-        // 2. Curate 5 flagship showcase exceptions with varied severities and realistic discrepancy types
-        var exceptions = await _context.Exceptions
-            .OrderBy(e => e.CreatedAt)
-            .Take(10)
-            .ToListAsync(cancellationToken);
-
-        int index = 0;
-        foreach (var ex in exceptions)
+        await _auditService.LogAsync("SHOWCASE_DATA_RESET", "SYSTEM", Guid.Empty, CurrentUserId, new
         {
-            if (index == 0 && anu != null)
-            {
-                ex.AssignedTo = anu.Id;
-                ex.Status = ExceptionStatus.InProgress;
-                ex.Severity = "CRITICAL";
-                ex.ExceptionType = "AMOUNT_MISMATCH";
-                ex.DiscrepancyAmount = 15420.50m;
-            }
-            else if (index == 1 && anu != null)
-            {
-                ex.AssignedTo = anu.Id;
-                ex.Status = ExceptionStatus.InProgress;
-                ex.Severity = "HIGH";
-                ex.ExceptionType = "MISSING_SETTLEMENT";
-                ex.DiscrepancyAmount = 8500.00m;
-            }
-            else if (index == 2 && op != null)
-            {
-                ex.AssignedTo = op.Id;
-                ex.Status = ExceptionStatus.InProgress;
-                ex.Severity = "HIGH";
-                ex.ExceptionType = "UNMATCHED_EXTERNAL";
-                ex.DiscrepancyAmount = 5200.00m;
-            }
-            else if (index == 3 && op != null)
-            {
-                ex.AssignedTo = op.Id;
-                ex.Status = ExceptionStatus.InProgress;
-                ex.Severity = "MEDIUM";
-                ex.ExceptionType = "PARTIAL_SETTLEMENT";
-                ex.DiscrepancyAmount = 1250.00m;
-            }
-            else if (index == 4)
-            {
-                // Showcase Unassigned Outlier
-                ex.AssignedTo = null;
-                ex.Status = ExceptionStatus.Open;
-                ex.Severity = "CRITICAL";
-                ex.ExceptionType = "AMBIGUOUS_MATCH";
-                ex.DiscrepancyAmount = 45000.00m;
-            }
-            else
-            {
-                ex.Status = ExceptionStatus.Open;
-                ex.AssignedTo = null;
-            }
+            totalTransactions = summary.TotalTransactions,
+            matchedTransactions = summary.MatchedTransactions,
+            totalExceptions = summary.TotalExceptions,
+            assignedToAnu = summary.AssignedToAnu,
+            assignedToOperationalAnalyst = summary.AssignedToOperationalAnalyst,
+            unassignedOutliers = summary.UnassignedOpen
+        }, null, cancellationToken);
 
-            ex.UpdatedAt = DateTimeOffset.UtcNow;
-            index++;
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        await _auditService.LogAsync("SHOWCASE_DATA_RESET", "SYSTEM", Guid.Empty, CurrentUserId, new { resetCount = exceptions.Count }, null, cancellationToken);
-
-        await _notificationService.BroadcastEventAsync("SYSTEM_RESEEDED", "Showcase State Reset", "Platform data has been refreshed to pristine demonstration benchmark.", null, cancellationToken);
+        await _notificationService.BroadcastEventAsync("SYSTEM_RESEEDED", "Showcase State Reset", "Platform dataset rebuilt to mathematically verified demonstration benchmark.", null, cancellationToken);
 
         return Ok(new
         {
             success = true,
-            message = "Showcase dataset successfully restored.",
-            resetCount = exceptions.Count,
-            assignedToAnu = 2,
-            assignedToOperationalAnalyst = 2,
-            unassignedOutliers = 1
+            message = "Showcase dataset cleanly rebuilt with verified accounting invariants.",
+            resetCount = summary.TotalExceptions,
+            totalTransactions = summary.TotalTransactions,
+            matchedTransactions = summary.MatchedTransactions,
+            openExceptions = summary.OpenExceptions,
+            resolvedExceptions = summary.ResolvedExceptions,
+            assignedToAnu = summary.AssignedToAnu,
+            assignedToOperationalAnalyst = summary.AssignedToOperationalAnalyst,
+            unassignedOutliers = summary.UnassignedOpen
         });
     }
 }

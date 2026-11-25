@@ -10,6 +10,7 @@ using LendGuard.Application.DTOs;
 using LendGuard.Domain;
 using LendGuard.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LendGuard.Application.Services;
 
@@ -27,11 +28,13 @@ public class ReconciliationService : IReconciliationService
 {
     private readonly IApplicationDbContext _context;
     private readonly IAuditService _auditService;
+    private readonly IServiceScopeFactory? _scopeFactory;
 
-    public ReconciliationService(IApplicationDbContext context, IAuditService auditService)
+    public ReconciliationService(IApplicationDbContext context, IAuditService auditService, IServiceScopeFactory? scopeFactory = null)
     {
         _context = context;
         _auditService = auditService;
+        _scopeFactory = scopeFactory;
     }
 
     public async Task<StartReconciliationResponse> QueueReconciliationAsync(StartReconciliationRequest request, Guid userId, CancellationToken cancellationToken = default)
@@ -117,18 +120,25 @@ public class ReconciliationService : IReconciliationService
 
         await _auditService.LogAsync("RECONCILIATION_STARTED", "RECONCILIATION_RUN", run.Id, userId, new { internalBatchId = run.InternalBatchId, externalBatchId = run.ExternalBatchId, ruleVersion = run.RuleVersion }, null, cancellationToken);
 
-        // Process reconciliation
-        _ = Task.Run(async () =>
+        // Process reconciliation inside an isolated DI scope when running inside host container
+        if (_scopeFactory != null)
         {
-            try
+            var scopeFactory = _scopeFactory;
+            var queuedRunId = run.Id;
+            _ = Task.Run(async () =>
             {
-                await ExecuteReconciliationRunAsync(run.Id, CancellationToken.None);
-            }
-            catch
-            {
-                // Background worker also polls for queued/pending jobs
-            }
-        });
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var scopedRecon = scope.ServiceProvider.GetRequiredService<IReconciliationService>();
+                    await scopedRecon.ExecuteReconciliationRunAsync(queuedRunId, CancellationToken.None);
+                }
+                catch
+                {
+                    // Background worker also polls for queued/pending jobs
+                }
+            });
+        }
 
         return new StartReconciliationResponse
         {
@@ -145,7 +155,7 @@ public class ReconciliationService : IReconciliationService
             .Include(r => r.ExternalBatch)
             .FirstOrDefaultAsync(r => r.Id == runId, cancellationToken);
 
-        if (run == null || run.Status == ReconciliationRunStatus.Completed)
+        if (run == null || run.Status == ReconciliationRunStatus.Completed || run.Status == ReconciliationRunStatus.Processing)
         {
             return;
         }
@@ -514,6 +524,7 @@ public class ReconciliationService : IReconciliationService
                             Id = Guid.NewGuid(),
                             ReconciliationRunId = run.Id,
                             InternalTransactionId = intTxn.Id,
+                            ExternalTransactionId = candidates.FirstOrDefault()?.Id,
                             ExceptionType = ExceptionType.AmbiguousMatch,
                             Severity = ExceptionSeverity.High,
                             Status = ExceptionStatus.Open,
@@ -563,6 +574,16 @@ public class ReconciliationService : IReconciliationService
             run.ExceptionCount = exceptions.Count;
             run.Status = ReconciliationRunStatus.Completed;
             run.CompletedAt = DateTimeOffset.UtcNow;
+
+            var runIdToken = run.Id.ToString();
+            var pendingJobs = await _context.BackgroundJobs
+                .Where(j => j.JobType == BackgroundJobType.Reconciliation && j.Status == BackgroundJobStatus.Pending && j.Payload.Contains(runIdToken))
+                .ToListAsync(cancellationToken);
+            foreach (var pendingJob in pendingJobs)
+            {
+                pendingJob.Status = BackgroundJobStatus.Completed;
+                pendingJob.ProcessedAt = DateTimeOffset.UtcNow;
+            }
 
             await _context.SaveChangesAsync(cancellationToken);
 
@@ -664,6 +685,7 @@ public class ReconciliationService : IReconciliationService
                 TransactionId = mi.TransactionId,
                 Side = mi.Side,
                 AmountApplied = mi.AmountApplied,
+                Currency = mi.Transaction?.Currency ?? "INR",
                 TransactionReference = mi.Transaction?.TransactionReference
             }).ToList()
         }).ToList();
@@ -688,7 +710,9 @@ public class ReconciliationService : IReconciliationService
                                         Severity = e.Severity,
                                         Status = e.Status,
                                         DiscrepancyAmount = e.DiscrepancyAmount,
-                                        Currency = "INR",
+                                        Currency = e.InternalTransaction != null
+                                            ? e.InternalTransaction.Currency
+                                            : (e.ExternalTransaction != null ? e.ExternalTransaction.Currency : "INR"),
                                         AssignedTo = e.Assignee != null ? new UserProfileDto
                                         {
                                             Id = e.Assignee.Id,

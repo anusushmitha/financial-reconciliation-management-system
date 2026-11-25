@@ -46,12 +46,14 @@ public class TransactionService : ITransactionService
 
         if (filters.From.HasValue)
         {
-            query = query.Where(t => t.TransactionDate >= filters.From.Value);
+            var utcFrom = filters.From.Value.ToUniversalTime();
+            query = query.Where(t => t.TransactionDate >= utcFrom);
         }
 
         if (filters.To.HasValue)
         {
-            query = query.Where(t => t.TransactionDate <= filters.To.Value);
+            var utcTo = filters.To.Value.ToUniversalTime();
+            query = query.Where(t => t.TransactionDate <= utcTo);
         }
 
         var total = await query.CountAsync(cancellationToken);

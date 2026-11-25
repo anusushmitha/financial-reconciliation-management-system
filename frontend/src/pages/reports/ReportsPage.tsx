@@ -201,10 +201,11 @@ export const ReportsPage: React.FC = () => {
                 </div>
 
                 <div style={{ padding: '16px', backgroundColor: '#F0FDF4', borderRadius: '8px', border: '1px solid #BBF7D0' }}>
-                  <span style={{ fontSize: '12px', color: '#166534', display: 'block', marginBottom: '4px' }}>Clean Matches</span>
+                  <span style={{ fontSize: '12px', color: '#166534', display: 'block', marginBottom: '4px' }}>Matched Transactions</span>
                   <span style={{ fontSize: '24px', fontWeight: 700, color: '#16A34A', display: 'block' }}>
-                    <AnimatedCounter end={reconReport.totals.matched} />
+                    <AnimatedCounter end={reconReport.totals.matchedTransactions ?? reconReport.totals.matched} />
                   </span>
+                  <span style={{ fontSize: '11px', color: '#15803D' }}>{reconReport.totals.matched} match groups</span>
                 </div>
 
                 <div style={{ padding: '16px', backgroundColor: '#FEF2F2', borderRadius: '8px', border: '1px solid #FECACA' }}>
@@ -331,7 +332,7 @@ export const ReportsPage: React.FC = () => {
                   <div style={{ padding: '12px', border: '1px solid #BBF7D0', borderRadius: '6px', backgroundColor: '#F0FDF4' }}>
                     <div style={{ fontSize: '11px', color: '#166534' }}>Matched Transactions</div>
                     <div style={{ fontSize: '20px', fontWeight: 700, color: '#16A34A', marginTop: '4px' }}>
-                      {reconReport?.totals.matched ?? 0}
+                      {reconReport?.totals.matchedTransactions ?? reconReport?.totals.matched ?? 0}
                     </div>
                   </div>
                   <div style={{ padding: '12px', border: '1px solid #FECACA', borderRadius: '6px', backgroundColor: '#FEF2F2' }}>
@@ -343,7 +344,7 @@ export const ReportsPage: React.FC = () => {
                   <div style={{ padding: '12px', border: '1px solid #BFDBFE', borderRadius: '6px', backgroundColor: '#EFF6FF' }}>
                     <div style={{ fontSize: '11px', color: '#1E40AF' }}>Match Efficacy</div>
                     <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>
-                      {(reconReport?.matchRate ?? 95).toFixed(1)}%
+                      {(reconReport?.matchRate ?? 0).toFixed(1)}%
                     </div>
                   </div>
                 </div>

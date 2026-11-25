@@ -78,11 +78,12 @@ class AnomalyDetectorService:
 
         base_amt = expected if expected > 0 else amt
         rel_ratio = deviation / (base_amt + 1.0) if base_amt > 0 else (1.0 if deviation > 0 else 0.0)
+        curr = (evidence.currency or "INR").strip().upper()
 
-        # Multi-signal extraction
-        if deviation >= 5000 or rel_ratio >= 0.20:
+        # Multi-signal extraction (single-sided unmatched records naturally have ~100% rel_ratio, so gate ratio thresholds on dual-sided comparisons)
+        if deviation >= 5000 or (not unmatched_side and rel_ratio >= 0.20):
             signals.append("CRITICAL_AMOUNT_DEVIATION")
-        elif deviation >= 500 or rel_ratio >= 0.05:
+        elif deviation >= 500 or (not unmatched_side and rel_ratio >= 0.05):
             signals.append("MODERATE_AMOUNT_DEVIATION")
         elif deviation > 0:
             signals.append("MINOR_VARIANCE_TOLERANCE")
@@ -117,15 +118,22 @@ class AnomalyDetectorService:
         # 3. Tri-Model Ensemble (iForest 55% + Mahalanobis 45%)
         ensemble_score = (0.55 * iforest_norm) + (0.45 * mahal_norm)
 
-        # Calibrated domain floors
+        # Calibrated domain floors scaled cleanly to exposure severity
         if "CRITICAL_AMOUNT_DEVIATION" in signals:
-            ensemble_score = max(ensemble_score, 0.85)
+            ensemble_score = max(ensemble_score, 0.85 if deviation >= 10000 or (not unmatched_side and rel_ratio >= 0.20) else 0.76)
         if "COUNTERPARTY_RECONCILIATION_GAP" in signals:
-            ensemble_score = max(ensemble_score, 0.75)
+            if deviation >= 15000:
+                ensemble_score = max(ensemble_score, 0.82)
+            elif deviation >= 5000:
+                ensemble_score = max(ensemble_score, 0.72)
+            elif deviation >= 1000:
+                ensemble_score = max(ensemble_score, 0.56)
+            else:
+                ensemble_score = min(max(ensemble_score, 0.42), 0.58)
         if "HIGH_VALUE_EXPOSURE" in signals and deviation > 0:
             ensemble_score = max(ensemble_score, 0.88)
         if "TEMPORAL_DRIFT_OUTLIER" in signals:
-            ensemble_score = max(ensemble_score, 0.70)
+            ensemble_score = max(ensemble_score, 0.68)
         if deviation == 0 and date_drift <= 0.5 and not unmatched_side:
             ensemble_score = min(ensemble_score, 0.15)
 
@@ -164,7 +172,7 @@ class AnomalyDetectorService:
             {
                 "feature": "Discrepancy Magnitude",
                 "contributionPct": p_dev,
-                "rawMetric": f"INR {deviation:,.2f}",
+                "rawMetric": f"{curr} {deviation:,.2f}",
                 "impactDirection": "INCREASES_ANOMALY" if deviation > 0 else "NORMAL_RANGE"
             },
             {

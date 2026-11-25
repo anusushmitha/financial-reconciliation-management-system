@@ -98,7 +98,9 @@ public class ExceptionService : IExceptionService
                                    Severity = e.Severity,
                                    Status = e.Status,
                                    DiscrepancyAmount = e.DiscrepancyAmount,
-                                   Currency = "INR",
+                                   Currency = e.InternalTransaction != null
+                                       ? e.InternalTransaction.Currency
+                                       : (e.ExternalTransaction != null ? e.ExternalTransaction.Currency : "INR"),
                                    AssignedTo = e.Assignee != null ? new UserProfileDto
                                    {
                                        Id = e.Assignee.Id,
@@ -565,7 +567,7 @@ public class ExceptionService : IExceptionService
             ExpectedAmount = e.ExpectedAmount,
             ActualAmount = e.ActualAmount,
             DiscrepancyAmount = e.DiscrepancyAmount,
-            Currency = "INR",
+            Currency = e.InternalTransaction?.Currency ?? e.ExternalTransaction?.Currency ?? "INR",
             InternalTransactionId = e.InternalTransactionId,
             ExternalTransactionId = e.ExternalTransactionId,
             AssignedTo = e.Assignee != null ? new UserProfileDto

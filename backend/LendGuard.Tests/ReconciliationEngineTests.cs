@@ -729,4 +729,58 @@ public class ReconciliationEngineTests
         Assert.Equal(ExceptionType.AmountMismatch, exceptions[0].ExceptionType);
         Assert.Equal(500.00m, exceptions[0].DiscrepancyAmount);
     }
+
+    [Fact]
+    public async Task INV01_DashboardAndReportMath_ReconcileAggregateMatchesAndMultiCurrencyExceptions()
+    {
+        var (context, reconService) = CreateTestSetup();
+        var auditMock = new Mock<IAuditService>();
+        var aiClientMock = new Mock<IAiClientService>();
+        var dashboardService = new DashboardService(context);
+        var reportService = new ReportService(context, auditMock.Object);
+        var exceptionService = new ExceptionService(context, auditMock.Object, aiClientMock.Object);
+
+        var adminId = Guid.NewGuid();
+        var (intBatch, extBatch) = SeedBatches(context, adminId);
+        var now = DateTimeOffset.UtcNow;
+
+        // 1 internal settled via 2 external parts (3 matched txns) + 1 USD missing exception (1 unmatched txn)
+        var iAgg = new Transaction { Id = Guid.NewGuid(), ImportBatchId = intBatch.Id, SourceRowNumber = 1, TransactionReference = "AGG-1", TransactionDate = now, Amount = 30000m, Currency = "INR", SourceType = SourceType.Internal, Status = TransactionStatus.Pending };
+        var eAgg1 = new Transaction { Id = Guid.NewGuid(), ImportBatchId = extBatch.Id, SourceRowNumber = 1, TransactionReference = "E-AGG-1A", ExternalReference = "AGG-1", TransactionDate = now, Amount = 18000m, Currency = "INR", SourceType = SourceType.External, Status = TransactionStatus.Pending };
+        var eAgg2 = new Transaction { Id = Guid.NewGuid(), ImportBatchId = extBatch.Id, SourceRowNumber = 2, TransactionReference = "E-AGG-1B", ExternalReference = "AGG-1", TransactionDate = now, Amount = 12000m, Currency = "INR", SourceType = SourceType.External, Status = TransactionStatus.Pending };
+        var iUsd = new Transaction { Id = Guid.NewGuid(), ImportBatchId = intBatch.Id, SourceRowNumber = 2, TransactionReference = "USD-MIS-1", TransactionDate = now, Amount = 500m, Currency = "USD", SourceType = SourceType.Internal, Status = TransactionStatus.Pending };
+
+        context.Transactions.AddRange(iAgg, eAgg1, eAgg2, iUsd);
+        await context.SaveChangesAsync();
+
+        var run = await reconService.QueueReconciliationAsync(new StartReconciliationRequest { InternalBatchId = intBatch.Id, ExternalBatchId = extBatch.Id }, adminId);
+        await reconService.ExecuteReconciliationRunAsync(run.RunId);
+        var dbRun = await context.ReconciliationRuns.FindAsync(run.RunId);
+        Assert.NotNull(dbRun);
+        Assert.Equal(ReconciliationRunStatus.Completed, dbRun!.Status);
+        Assert.Equal(1, dbRun.MatchedCount);
+
+        var summary = await dashboardService.GetSummaryAsync();
+        Assert.Equal(4, summary.TotalTransactions);
+        Assert.Equal(3, summary.MatchedTransactions);
+        Assert.Equal(1, summary.UnmatchedTransactions); // Previously returned 0!
+        Assert.Equal(75.0m, summary.MatchRate);
+
+        var trends = await dashboardService.GetTrendsAsync(now.AddDays(-1), now.AddDays(1));
+        Assert.Single(trends.Items);
+        Assert.Equal(3, trends.Items[0].Matched); // Previously returned 2 via MatchedCount*2!
+        Assert.Equal(75.0m, trends.Items[0].MatchRate);
+
+        var emptyTrends = await dashboardService.GetTrendsAsync(now.AddDays(-60), now.AddDays(-30));
+        Assert.Empty(emptyTrends.Items); // No fake 1200 / 91.6% fallback!
+
+        var report = await reportService.GetReconciliationReportAsync(null, null, null, null);
+        Assert.Equal(1, report.Totals.Matched);
+        Assert.Equal(3, report.Totals.MatchedTransactions);
+        Assert.Equal(75.0m, report.MatchRate);
+
+        var exList = await exceptionService.GetExceptionsAsync(1, 20);
+        Assert.Single(exList.Items);
+        Assert.Equal("USD", exList.Items[0].Currency); // Previously hardcoded "INR"!
+    }
 }

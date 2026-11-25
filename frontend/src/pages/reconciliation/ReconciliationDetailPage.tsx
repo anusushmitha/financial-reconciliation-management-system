@@ -237,20 +237,22 @@ export const ReconciliationDetailPage: React.FC = () => {
                       </td>
                       <td>
                         <span style={{ backgroundColor: '#DCFCE7', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
-                          {m.confidence ? `${(m.confidence * 100).toFixed(0)}%` : '100%'}
+                          {m.confidence !== undefined && m.confidence !== null
+                            ? `${(m.confidence <= 1 ? m.confidence * 100 : m.confidence).toFixed(0)}%`
+                            : '100%'}
                         </span>
                       </td>
                       <td style={{ fontSize: '13px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {m.members.map((mem, idx) => (
                             <span key={idx} style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-                              <strong style={{ color: '#475569' }}>[{mem.side}]</strong> {mem.transactionReference || mem.transactionId.slice(0, 8)}: ${Number(mem.amountApplied).toFixed(2)}
+                              <strong style={{ color: '#475569' }}>[{mem.side}]</strong> {mem.transactionReference || mem.transactionId.slice(0, 8)}: {mem.currency || 'INR'} {Number(mem.amountApplied).toFixed(2)}
                             </span>
                           ))}
                         </div>
                       </td>
                       <td style={{ fontWeight: 600 }}>
-                        ${m.members.reduce((sum, mem) => sum + Number(mem.amountApplied), 0).toFixed(2)}
+                        {m.members[0]?.currency || 'INR'} {m.members.reduce((sum, mem) => sum + Number(mem.amountApplied), 0).toFixed(2)}
                       </td>
                     </tr>
                   ))}

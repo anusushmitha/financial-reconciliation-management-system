@@ -108,6 +108,7 @@ public class AiClientService : IAiClientService
         }
 
         // Resilient fallback when AI service is unavailable
+        var fallbackCurrency = effectiveTxn?.Currency ?? "INR";
         var fallbackScore = (exception.DiscrepancyAmount > 5000) ? 0.85 : 0.35;
         var fallbackRisk = fallbackScore >= 0.8 ? "CRITICAL" : "MODERATE";
         return new AiAnalysisDto
@@ -115,7 +116,7 @@ public class AiClientService : IAiClientService
             AnalysisId = analysisId,
             Status = AiAnalysisStatus.Completed,
             AnalysisType = AiAnalysisType.Anomaly,
-            Summary = $"Heuristic anomaly score: {fallbackScore:P0} ({fallbackRisk} Risk) based on discrepancy magnitude of INR {exception.DiscrepancyAmount:N2}.",
+            Summary = $"Heuristic anomaly score: {fallbackScore:P0} ({fallbackRisk} Risk) based on discrepancy magnitude of {fallbackCurrency} {exception.DiscrepancyAmount:N2}.",
             Evidence = new
             {
                 anomalyScore = fallbackScore,
@@ -182,7 +183,7 @@ public class AiClientService : IAiClientService
         }
 
         // Resilient deterministic explanation
-        var curr = internalTxn?.Currency ?? "INR";
+        var curr = internalTxn?.Currency ?? externalTxn?.Currency ?? "INR";
         var summary = exception.ExceptionType switch
         {
             ExceptionType.AmountMismatch => $"The transaction amounts differ by {curr} {exception.DiscrepancyAmount:N2}. Expected {curr} {exception.ExpectedAmount:N2}, settlement was {curr} {exception.ActualAmount:N2}.",

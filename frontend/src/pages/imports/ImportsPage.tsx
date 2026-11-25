@@ -29,6 +29,13 @@ export const ImportsPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [preflight, setPreflight] = useState<{
+    verified: boolean;
+    rowCount: number;
+    headers: string[];
+    previewRows: string[][];
+    missingFields: string[];
+  } | null>(null);
 
   // History state
   const [batches, setBatches] = useState<ImportBatchSummary[]>([]);
@@ -62,10 +69,41 @@ export const ImportsPage: React.FC = () => {
       if (!file.name.endsWith('.csv')) {
         setUploadError('Only CSV files are supported.');
         setSelectedFile(null);
+        setPreflight(null);
         return;
       }
       setSelectedFile(file);
       setUploadError(null);
+
+      // Perform client-side pre-flight schema inspection
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const text = (event.target?.result as string) || '';
+          const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+          if (lines.length > 0) {
+            const headerLine = lines[0].toLowerCase();
+            const headers = headerLine.split(',').map((h) => h.trim().replace(/^["']|["']$/g, ''));
+            const required = ['transaction_reference', 'transaction_date', 'amount', 'currency'];
+            const missing = required.filter((r) => !headers.some((h) => h.includes(r)));
+
+            const preview = lines.slice(1, 4).map((line) =>
+              line.split(',').map((cell) => cell.trim().replace(/^["']|["']$/g, ''))
+            );
+
+            setPreflight({
+              verified: missing.length === 0,
+              rowCount: lines.length - 1,
+              headers,
+              previewRows: preview,
+              missingFields: missing,
+            });
+          }
+        } catch {
+          setPreflight(null);
+        }
+      };
+      reader.readAsText(file.slice(0, 32768)); // read first 32KB for instant response
     }
   };
 
@@ -300,6 +338,60 @@ export const ImportsPage: React.FC = () => {
                       {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'Maximum file size 25MB • Strict CSV UTF-8'}
                     </div>
                   </div>
+
+                  {/* Pre-Flight Client-Side Schema Inspector */}
+                  {preflight && (
+                    <div
+                      style={{
+                        marginTop: '12px',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        backgroundColor: preflight.verified ? '#F0FDF4' : '#FEF2F2',
+                        border: preflight.verified ? '1px solid #BBF7D0' : '1px solid #FECACA',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {preflight.verified ? (
+                            <CheckCircle2 size={16} style={{ color: '#16A34A' }} />
+                          ) : (
+                            <AlertCircle size={16} style={{ color: '#DC2626' }} />
+                          )}
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: preflight.verified ? '#15803D' : '#DC2626' }}>
+                            {preflight.verified
+                              ? 'Pre-Flight Schema Verified • Ready for Ingestion'
+                              : `Missing Required Headers: ${preflight.missingFields.join(', ')}`}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+                          ~{preflight.rowCount} rows detected
+                        </span>
+                      </div>
+
+                      {preflight.previewRows.length > 0 && (
+                        <div style={{ overflowX: 'auto', maxHeight: '100px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid #E2E8F0', padding: '6px' }}>
+                          <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse', color: '#475569' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #E2E8F0', color: '#1E293B', fontWeight: 600 }}>
+                                {preflight.headers.slice(0, 5).map((h, i) => (
+                                  <th key={i} style={{ padding: '3px 6px', textAlign: 'left' }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {preflight.previewRows.map((row, rIdx) => (
+                                <tr key={rIdx} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                  {row.slice(0, 5).map((cell, cIdx) => (
+                                    <td key={cIdx} style={{ padding: '3px 6px', fontFamily: 'monospace' }}>{cell}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button

@@ -41,7 +41,10 @@ def main():
     print("=== LENDGUARD AI: Reproducible Realistic Multi-User Load & Capacity Test ===")
     
     # Authenticate
-    token = login("admin@example.com", "Admin123!")
+    try:
+        token = login("staging.admin@lendguard.internal", "StagingAdmin_Secure2026!")
+    except Exception:
+        token = login("admin@example.com", "Admin123!")
     headers = {"Authorization": f"Bearer {token}"}
     print("1. Authenticated as Admin successfully.")
 

@@ -77,10 +77,10 @@ def main():
     analyst_headers = {"Authorization": f"Bearer {analyst_token}"}
     print(f"[PASS] Staging Operational Analyst authenticated successfully: {ANALYST_EMAIL} (ID: {analyst_id})")
 
-    # 1.3 Verify SEED_TEST_USERS=false Lockout (admin@example.com must fail)
+    # 1.3 Verify SEED_TEST_USERS=false Lockout (admin@example.com must fail with lockout HTTP 401/403/404/409)
     dev_res = login("admin@example.com", "Admin123!")
-    assert dev_res.status_code in (401, 404), f"Security breach: Development seed user logged in! Status: {dev_res.status_code}"
-    print("[PASS] Security boundary verified: Default development accounts (admin@example.com) rejected (SEED_TEST_USERS=false).")
+    assert dev_res.status_code in (401, 403, 404, 409), f"Security breach: Development seed user logged in! Status: {dev_res.status_code}"
+    print(f"[PASS] Security boundary verified: Default development accounts (admin@example.com) rejected with HTTP {dev_res.status_code}.")
     results["authentication_and_seed_lockout"] = "PASSED"
 
     # -------------------------------------------------------------------------

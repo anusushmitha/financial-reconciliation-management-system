@@ -405,6 +405,13 @@ class ApiService {
     if (params.entityType) searchParams.append('entityType', params.entityType);
     return this.request<PaginatedResponse<AuditLog>>(`/audit-logs?${searchParams}`);
   }
+
+  // System Demo Seed
+  async resetDemoSeed(): Promise<{ success: boolean; message: string; resetCount: number }> {
+    return this.request<{ success: boolean; message: string; resetCount: number }>('/system/demo-seed', {
+      method: 'POST',
+    });
+  }
 }
 
 export const api = new ApiService();

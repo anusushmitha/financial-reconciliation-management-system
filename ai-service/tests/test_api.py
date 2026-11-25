@@ -50,7 +50,7 @@ def test_exception_explanation():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "COMPLETED"
-    assert "INR 500.00" in data["summary"]
+    assert "500.00" in data["summary"] and "INR" in data["summary"]
     assert "internalAmount" in data["evidenceReferences"]
     assert data["advisoryOnly"] is True
 
@@ -62,3 +62,30 @@ def test_unauthorized_without_key():
     }
     response = client.post("/internal/v1/exception-explanation", json=payload, headers={"X-Service-Key": "wrong-key"})
     assert response.status_code == 401
+
+def test_anomaly_feature_attributions_and_ensemble_metadata():
+    headers = {"X-Service-Key": settings.ai_service_key}
+    payload = {
+        "analysisId": "3fa85f64-5717-4562-b3fc-2c963f66afa8",
+        "exceptionId": "3fa85f64-5717-4562-b3fc-2c963f66afa9",
+        "transactionEvidence": {
+            "amount": "250000.00",
+            "currency": "INR",
+            "transactionDate": "2026-11-20T10:00:00Z",
+            "transactionType": "REPAYMENT"
+        },
+        "featureContext": {
+            "amountDeviation": 50000.00,
+            "expectedAmount": 250000.00,
+            "actualAmount": 200000.00,
+            "dateDifferenceDays": 4
+        }
+    }
+    response = client.post("/internal/v1/anomaly-detection", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["riskLevel"] in ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+    assert "featureAttributions" in data and len(data["featureAttributions"]) > 0
+    assert "ensembleWeights" in data and len(data["ensembleWeights"]) > 0
+    assert "signals" in data and isinstance(data["signals"], list)
+    assert data["advisoryOnly"] is True

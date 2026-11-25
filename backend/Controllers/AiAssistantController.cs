@@ -102,7 +102,7 @@ namespace LendGuard.Api.Controllers
                 target_transaction = targetTx == null ? null : new
                 {
                     referenceId = targetTx.ReferenceId,
-                    amount = (double)targetTx.Amount,
+                    amount = targetTx.Amount,
                     sourceSystem = targetTx.SourceSystem,
                     status = targetTx.ReconciliationStatus
                 },
@@ -112,7 +112,7 @@ namespace LendGuard.Api.Controllers
                     transactionReference = targetEx.TransactionReference,
                     exceptionType = targetEx.ExceptionType,
                     severity = targetEx.Severity,
-                    amount = (double)targetEx.Amount,
+                    amount = targetEx.Amount,
                     status = targetEx.Status,
                     description = targetEx.Description,
                     evidence = targetEx.Evidence

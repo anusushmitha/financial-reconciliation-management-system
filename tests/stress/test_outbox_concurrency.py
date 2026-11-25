@@ -68,7 +68,7 @@ def get_outbox_metrics():
             print(f"     - {status}: {cnt}")
     
     # Check for deadlocks or blocking locks in pg_stat_database / pg_locks
-    deadlocks_query = "SELECT deadlocks FROM pg_stat_database WHERE datname = 'lendguard';"
+    deadlocks_query = "SELECT COALESCE(SUM(deadlocks), 0) FROM pg_stat_database WHERE datname IN ('lendguard', 'lendguard_staging');"
     deadlocks = int(run_sql(deadlocks_query) or 0)
     print(f"   PostgreSQL total system deadlocks recorded: {deadlocks}")
     return deadlocks == 0

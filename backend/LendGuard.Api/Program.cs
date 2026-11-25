@@ -1,6 +1,9 @@
 using System.Text;
+using LendGuard.Api.Hubs;
 using LendGuard.Api.Middlewares;
+using LendGuard.Api.Services;
 using LendGuard.Application;
+using LendGuard.Application.Common.Interfaces;
 using LendGuard.Infrastructure;
 using LendGuard.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -23,6 +26,10 @@ builder.WebHost.UseUrls(defaultUrl);
 // 1. Add Infrastructure & Application layers
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
+
+// 1.1 Add SignalR & Notification Services
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificationService, SignalRNotificationService>();
 
 // 2. Add Authentication & JWT
 var jwtSecret = builder.Configuration["JWT_SECRET"] ?? "LendGuard_Super_Secret_Key_For_Jwt_Authentication_Must_Be_Long_2026";
@@ -81,5 +88,6 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<LendGuardHub>("/hubs/lendguard");
 
 app.Run();

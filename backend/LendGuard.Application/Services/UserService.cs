@@ -183,6 +183,12 @@ public class UserService : IUserService
             throw new KeyNotFoundException("User not found.");
         }
 
+        // Prevent self-deactivation
+        if (!request.IsActive && user.Id == currentUserId)
+        {
+            throw new InvalidOperationException("Administrators cannot deactivate their own active account.");
+        }
+
         // Prevent deactivating final active admin
         if (!request.IsActive && user.Role == UserRole.Admin)
         {

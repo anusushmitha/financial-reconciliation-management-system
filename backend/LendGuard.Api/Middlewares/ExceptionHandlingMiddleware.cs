@@ -40,7 +40,10 @@ public class ExceptionHandlingMiddleware
 
         var (statusCode, code, message) = exception switch
         {
-            UnauthorizedAccessException uae => (HttpStatusCode.Unauthorized, "INVALID_CREDENTIALS", uae.Message),
+            UnauthorizedAccessException uae when context.User?.Identity?.IsAuthenticated == true
+                => (HttpStatusCode.Forbidden, "FORBIDDEN", uae.Message),
+            UnauthorizedAccessException uae
+                => (HttpStatusCode.Unauthorized, "INVALID_CREDENTIALS", uae.Message),
             KeyNotFoundException knf => (HttpStatusCode.NotFound, "NOT_FOUND", knf.Message),
             ArgumentException ae => (HttpStatusCode.BadRequest, "VALIDATION_ERROR", ae.Message),
             InvalidOperationException ioe when ioe.Message.Contains("active") || ioe.Message.Contains("already") => (HttpStatusCode.Conflict, "CONFLICT", ioe.Message),

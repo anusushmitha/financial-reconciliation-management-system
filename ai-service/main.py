@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import numpy as np
-import pandas as pd
 from sklearn.ensemble import IsolationForest
 import os
 import math

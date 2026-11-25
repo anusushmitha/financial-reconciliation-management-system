@@ -310,7 +310,119 @@ public class ExceptionWorkflowTests
         Assert.NotNull(result);
         var analyses = await service.GetExceptionAnalysesAsync(exception.Id, latestOnly: true);
         Assert.Equal(2, analyses.Count);
-        Assert.Contains(analyses, a => a.AnalysisType == AiAnalysisType.Anomaly && a.Summary.Contains("88%"));
+        Assert.Contains(analyses, a => a.AnalysisType == AiAnalysisType.Anomaly && a.Summary != null && a.Summary.Contains("88%"));
         Assert.Contains(analyses, a => a.AnalysisType == AiAnalysisType.Explanation && a.ModelName == "nvidia/nemotron-3.5-bolt-e4b");
+    }
+
+    [Fact]
+    public async Task RT01_AssignAndResolveException_BroadcastsSignalRNotifications()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<LendGuardDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new LendGuardDbContext(options);
+        var auditMock = new Mock<IAuditService>();
+        var aiMock = new Mock<IAiClientService>();
+        var notifMock = new Mock<INotificationService>();
+
+        var service = new ExceptionService(context, auditMock.Object, aiMock.Object, notifMock.Object);
+
+        var adminId = Guid.NewGuid();
+        var analyst = new User
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Anu Sushmitha",
+            Email = "sanushusmitha@gmail.com",
+            Role = UserRole.Analyst,
+            IsActive = true
+        };
+        context.Users.Add(analyst);
+
+        var exc = new DiscrepancyException
+        {
+            Id = Guid.NewGuid(),
+            ReconciliationRunId = Guid.NewGuid(),
+            ExceptionType = ExceptionType.AmountMismatch,
+            Severity = ExceptionSeverity.High,
+            Status = ExceptionStatus.Open,
+            DiscrepancyAmount = 500.00m
+        };
+        context.Exceptions.Add(exc);
+        await context.SaveChangesAsync();
+
+        // Act 1: Assign
+        await service.AssignExceptionAsync(exc.Id, new AssignExceptionRequest { AssignedTo = analyst.Id }, adminId);
+
+        // Act 2: Resolve
+        await service.ResolveExceptionAsync(exc.Id, new ResolveExceptionRequest
+        {
+            ResolutionCategory = "CONFIRMED_FEE",
+            Explanation = "Gateway fee reconciled"
+        }, analyst.Id, UserRole.Analyst);
+
+        // Assert both SignalR events fired
+        notifMock.Verify(n => n.BroadcastEventAsync(
+            "EXCEPTION_ASSIGNED",
+            It.IsAny<string>(),
+            It.Is<string>(msg => msg.Contains("Anu Sushmitha")),
+            It.IsAny<object>(),
+            It.IsAny<System.Threading.CancellationToken>()), Times.Once);
+
+        notifMock.Verify(n => n.BroadcastEventAsync(
+            "EXCEPTION_RESOLVED",
+            It.IsAny<string>(),
+            It.Is<string>(msg => msg.Contains("CONFIRMED_FEE")),
+            It.IsAny<object>(),
+            It.IsAny<System.Threading.CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RT02_BatchAssignExceptions_BroadcastsBatchSignalRNotification()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<LendGuardDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new LendGuardDbContext(options);
+        var auditMock = new Mock<IAuditService>();
+        var aiMock = new Mock<IAiClientService>();
+        var notifMock = new Mock<INotificationService>();
+
+        var service = new ExceptionService(context, auditMock.Object, aiMock.Object, notifMock.Object);
+
+        var adminId = Guid.NewGuid();
+        var analyst = new User
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Operational Analyst",
+            Email = "staging.analyst@lendguard.internal",
+            Role = UserRole.Analyst,
+            IsActive = true
+        };
+        context.Users.Add(analyst);
+
+        var exc1 = new DiscrepancyException { Id = Guid.NewGuid(), ReconciliationRunId = Guid.NewGuid(), ExceptionType = ExceptionType.AmountMismatch, Severity = ExceptionSeverity.Medium, Status = ExceptionStatus.Open };
+        var exc2 = new DiscrepancyException { Id = Guid.NewGuid(), ReconciliationRunId = Guid.NewGuid(), ExceptionType = ExceptionType.MissingSettlement, Severity = ExceptionSeverity.Low, Status = ExceptionStatus.Open };
+        context.Exceptions.AddRange(exc1, exc2);
+        await context.SaveChangesAsync();
+
+        // Act
+        var res = await service.BatchAssignExceptionsAsync(new BatchAssignExceptionsRequest
+        {
+            ExceptionIds = new List<Guid> { exc1.Id, exc2.Id },
+            AssignedTo = analyst.Id
+        }, adminId);
+
+        // Assert
+        Assert.Equal(2, res.AssignedCount);
+        notifMock.Verify(n => n.BroadcastEventAsync(
+            "BATCH_ASSIGNED",
+            It.IsAny<string>(),
+            It.Is<string>(msg => msg.Contains("2 discrepancies")),
+            It.IsAny<object>(),
+            It.IsAny<System.Threading.CancellationToken>()), Times.Once);
     }
 }

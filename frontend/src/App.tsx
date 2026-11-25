@@ -23,6 +23,9 @@ import { ReportsPage } from './pages/reports/ReportsPage';
 import { AuditHistoryPage } from './pages/audit/AuditHistoryPage';
 import { UserManagementPage } from './pages/users/UserManagementPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
+import { ReconciliationRuleBuilderPage } from './pages/rules/ReconciliationRuleBuilderPage';
+import { ToastProvider } from './context/ToastContext';
+import { RealtimeProvider } from './context/RealtimeContext';
 
 // Protected Route Guard
 const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({
@@ -68,78 +71,83 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Auth Routes */}
-          <Route element={<AuthLayout />}>
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <LoginPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/forgot-password"
-              element={
-                <PublicRoute>
-                  <ForgotPasswordPage />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/reset-password"
-              element={
-                <PublicRoute>
-                  <ResetPasswordPage />
-                </PublicRoute>
-              }
-            />
-          </Route>
+      <ToastProvider>
+        <RealtimeProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Public Auth Routes */}
+              <Route element={<AuthLayout />}>
+                <Route
+                  path="/login"
+                  element={
+                    <PublicRoute>
+                      <LoginPage />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/forgot-password"
+                  element={
+                    <PublicRoute>
+                      <ForgotPasswordPage />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/reset-password"
+                  element={
+                    <PublicRoute>
+                      <ResetPasswordPage />
+                    </PublicRoute>
+                  }
+                />
+              </Route>
 
-          {/* Protected Application Routes */}
-          <Route
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/transactions" element={<TransactionListPage />} />
-            <Route path="/transactions/:id" element={<TransactionDetailPage />} />
-            <Route path="/imports" element={<ImportsPage />} />
-            <Route path="/imports/:id/validation" element={<ValidationResultsPage />} />
-            <Route path="/reconciliation-runs" element={<ReconciliationListPage />} />
-            <Route path="/reconciliation-runs/:id" element={<ReconciliationDetailPage />} />
-            <Route path="/exceptions" element={<ExceptionListPage />} />
-            <Route path="/exceptions/:id" element={<ExceptionDetailPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route
-              path="/audit-logs"
-              element={
-                <ProtectedRoute adminOnly>
-                  <AuditHistoryPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/users"
-              element={
-                <ProtectedRoute adminOnly>
-                  <UserManagementPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/profile" element={<ProfilePage />} />
-          </Route>
+              {/* Protected Application Routes */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/transactions" element={<TransactionListPage />} />
+                <Route path="/transactions/:id" element={<TransactionDetailPage />} />
+                <Route path="/imports" element={<ImportsPage />} />
+                <Route path="/imports/:id/validation" element={<ValidationResultsPage />} />
+                <Route path="/reconciliation-runs" element={<ReconciliationListPage />} />
+                <Route path="/reconciliation-runs/:id" element={<ReconciliationDetailPage />} />
+                <Route path="/exceptions" element={<ExceptionListPage />} />
+                <Route path="/exceptions/:id" element={<ExceptionDetailPage />} />
+                <Route path="/rules" element={<ReconciliationRuleBuilderPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route
+                  path="/audit-logs"
+                  element={
+                    <ProtectedRoute adminOnly>
+                      <AuditHistoryPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/users"
+                  element={
+                    <ProtectedRoute adminOnly>
+                      <UserManagementPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Route>
 
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
+              {/* Catch-all */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </RealtimeProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 };

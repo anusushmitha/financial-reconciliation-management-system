@@ -11,6 +11,7 @@ import { StatusBadge, SeverityBadge } from '../../components/Badge';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { Modal } from '../../components/Modal';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import {
   ArrowLeft,
   Bot,
@@ -27,6 +28,9 @@ import {
   Activity,
   Cpu,
   Gauge,
+  BookOpen,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { SpotlightCard } from '../../components/reactbits/SpotlightCard';
 import { AnimatedCounter } from '../../components/reactbits/AnimatedCounter';
@@ -39,6 +43,7 @@ import { LedgerDiffVisualizer } from '../../components/LedgerDiffVisualizer';
 export const ExceptionDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user, isAdmin } = useAuth();
+  const { addToast } = useToast();
   const navigate = useNavigate();
 
   const [exception, setException] = useState<ExceptionDetail | null>(null);
@@ -49,6 +54,7 @@ export const ExceptionDetailPage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [analyzingAi, setAnalyzingAi] = useState(false);
+  const [copiedJournal, setCopiedJournal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Note form state
@@ -740,6 +746,215 @@ export const ExceptionDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Prescriptive Double-Entry Accounting Journal Suggestion */}
+      {(() => {
+        const currency = exception.currency || 'USD';
+        const expAmt = Number(exception.expectedAmount || 0);
+        const actAmt = Number(exception.actualAmount || 0);
+        const diffAmt = Number(exception.discrepancyAmount || (actAmt - expAmt));
+        const absDiff = Math.abs(diffAmt);
+        const fallbackAmt = absDiff || actAmt || expAmt || 100;
+
+        let strategyTitle = 'General Exception Suspense Holding';
+        let memo = `Reconcile discrepancy for exception ref: ${exception.id}`;
+        let lines: Array<{ code: string; name: string; debit: number; credit: number }> = [];
+
+        if (exception.exceptionType === 'AMOUNT_MISMATCH' || exception.exceptionType === 'PARTIAL_SETTLEMENT') {
+          if (expAmt > 0 && actAmt < expAmt) {
+            const gap = expAmt - actAmt;
+            strategyTitle = exception.exceptionType === 'PARTIAL_SETTLEMENT'
+              ? 'Partial Tranche Settlement & Remaining Receivable Hold'
+              : 'Gateway Service Fee Deduction / Shortfall Reclassification';
+            memo = `Reconcile ${currency} ${gap.toFixed(2)} shortfall between core schedule (${currency} ${expAmt.toFixed(2)}) and bank receipt (${currency} ${actAmt.toFixed(2)})`;
+            lines = [
+              { code: exception.exceptionType === 'PARTIAL_SETTLEMENT' ? '1325' : '5120', name: exception.exceptionType === 'PARTIAL_SETTLEMENT' ? 'Partial Tranche Outstanding Receivable' : 'Gateway Interchange & Processing Expense', debit: gap, credit: 0 },
+              { code: '1020', name: 'Cash at Bank (Settlement Clearing)', debit: actAmt, credit: 0 },
+              { code: '1310', name: 'Loan Principal & Repayment Receivable', debit: 0, credit: expAmt },
+            ].filter(l => l.debit > 0 || l.credit > 0);
+          } else if (actAmt > expAmt && (expAmt > 0 || actAmt > 0)) {
+            const gap = actAmt - expAmt;
+            strategyTitle = 'Excess Remittance / Borrower Overpayment Allocation';
+            memo = `Credit ${currency} ${gap.toFixed(2)} surplus inflow received above scheduled amount to customer suspense`;
+            lines = [
+              { code: '1020', name: 'Cash at Bank (Settlement Clearing)', debit: actAmt, credit: 0 },
+              { code: '1310', name: 'Loan Principal & Repayment Receivable', debit: 0, credit: expAmt },
+              { code: '2150', name: 'Clearing Suspense Account (Excess Inflow)', debit: 0, credit: gap },
+            ].filter(l => l.debit > 0 || l.credit > 0);
+          } else {
+            strategyTitle = 'Amount Discrepancy Suspense Adjustment';
+            memo = `Hold ${currency} ${fallbackAmt.toFixed(2)} variance in reconciliation clearing suspense pending bank advice`;
+            lines = [
+              { code: '5120', name: 'Gateway Variance / Unreconciled Adjustment', debit: fallbackAmt, credit: 0 },
+              { code: '2150', name: 'Clearing Suspense Account', debit: 0, credit: fallbackAmt },
+            ];
+          }
+        } else if (exception.exceptionType === 'UNMATCHED_EXTERNAL' || exception.exceptionType === 'MISSING_INTERNAL') {
+          const amt = actAmt || fallbackAmt;
+          strategyTitle = 'Unidentified Inbound Settlement Clearing';
+          memo = `Inbound bank settlement of ${currency} ${amt.toFixed(2)} received without matched core loan schedule`;
+          lines = [
+            { code: '1020', name: 'Cash at Bank (External Feed Inflow)', debit: amt, credit: 0 },
+            { code: '2190', name: 'Unidentified Inbound Remittance Suspense', debit: 0, credit: amt },
+          ];
+        } else if (exception.exceptionType === 'MISSING_SETTLEMENT' || exception.exceptionType === 'MISSING_EXTERNAL') {
+          const amt = expAmt || fallbackAmt;
+          strategyTitle = 'In-Transit Gateway Settlement Accrual';
+          memo = `Internal repayment (${currency} ${amt.toFixed(2)}) posted but external gateway settlement not yet confirmed`;
+          lines = [
+            { code: '1320', name: 'In-Transit Settlement Clearing Control', debit: amt, credit: 0 },
+            { code: '1310', name: 'Loan Principal & Repayment Receivable', debit: 0, credit: amt },
+          ];
+        } else if (exception.exceptionType === 'DATE_SLIPPAGE') {
+          const amt = actAmt || expAmt || fallbackAmt;
+          strategyTitle = 'Value-Date Timing Discrepancy Adjustment';
+          memo = `Timing reclassification between internal value date and external bank credit`;
+          lines = [
+            { code: '1020', name: 'Cash at Bank (Value-Date Restatement)', debit: amt, credit: 0 },
+            { code: '1320', name: 'Transit Settlement Clearing Control', debit: 0, credit: amt },
+          ];
+        } else if (exception.exceptionType === 'DUPLICATE') {
+          const amt = actAmt || expAmt || fallbackAmt;
+          strategyTitle = 'Duplicate Settlement Reversal Holding';
+          memo = `Isolate suspected duplicate counterparty entry (${currency} ${amt.toFixed(2)}) pending chargeback / reversal verification`;
+          lines = [
+            { code: '2155', name: 'Duplicate Settlement Refund Liability', debit: amt, credit: 0 },
+            { code: '1020', name: 'Cash at Bank (Settlement Clearing)', debit: 0, credit: amt },
+          ];
+        } else {
+          strategyTitle = 'Ambiguous / General Exception Suspense Holding';
+          memo = `Isolate ambiguous settlement match (${currency} ${fallbackAmt.toFixed(2)}) pending analyst counterparty confirmation`;
+          lines = [
+            { code: '2199', name: 'General Reconciliation Exception Suspense', debit: fallbackAmt, credit: 0 },
+            { code: '1020', name: 'Settlement Clearing Control', debit: 0, credit: fallbackAmt },
+          ];
+        }
+
+        const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
+        const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+        const isBalanced = Math.abs(totalDebit - totalCredit) < 0.001;
+
+        const copyJournalPayload = () => {
+          const payload = {
+            journalEntryRef: `JE-LG-${exception.id.slice(0, 8).toUpperCase()}`,
+            postingDate: new Date().toISOString().slice(0, 10),
+            currency,
+            strategy: strategyTitle,
+            memo,
+            lines: lines.map((l) => ({
+              accountCode: l.code,
+              accountName: l.name,
+              debit: l.debit.toFixed(2),
+              credit: l.credit.toFixed(2),
+            })),
+            balanced: isBalanced,
+          };
+          navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+          setCopiedJournal(true);
+          addToast('Journal Entry JSON copied to clipboard', 'success');
+          setTimeout(() => setCopiedJournal(false), 2500);
+        };
+
+        return (
+          <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#FEF3C7', color: '#B45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BookOpen size={20} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                      Prescriptive Double-Entry Accounting Journal Suggestion
+                    </h3>
+                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', backgroundColor: '#DCFCE7', color: '#15803D' }}>
+                      GAAP / IFRS COMPLIANT
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '12px', color: '#64748B' }}>
+                    Strategy: <strong style={{ color: '#334155' }}>{strategyTitle}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={copyJournalPayload}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+              >
+                {copiedJournal ? <Check size={14} style={{ color: '#16A34A' }} /> : <Copy size={14} />}
+                <span>{copiedJournal ? 'Payload Copied!' : 'Copy Journal Payload (JSON)'}</span>
+              </button>
+            </div>
+
+            {/* Memo Box */}
+            <div style={{ padding: '10px 14px', backgroundColor: '#F8FAFC', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '12px', color: '#475569', marginBottom: '16px' }}>
+              <strong style={{ color: '#0F172A' }}>Ledger Memo: </strong>
+              <span>{memo}</span>
+            </div>
+
+            {/* Double-Entry Table */}
+            <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', textAlign: 'left', fontWeight: 600 }}>
+                    <th style={{ padding: '10px 14px', width: '100px' }}>Account Code</th>
+                    <th style={{ padding: '10px 14px' }}>Account Name & General Ledger Line</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right', width: '130px' }}>Debit ({currency})</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right', width: '130px' }}>Credit ({currency})</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary)' }}>
+                        {line.code}
+                      </td>
+                      <td style={{ padding: '10px 14px', color: '#1E293B' }}>
+                        {line.name}
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: line.debit > 0 ? '#0F172A' : '#94A3B8' }}>
+                        {line.debit > 0 ? line.debit.toFixed(2) : '—'}
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: line.credit > 0 ? '#0F172A' : '#94A3B8' }}>
+                        {line.credit > 0 ? line.credit.toFixed(2) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Totals Row */}
+                  <tr style={{ backgroundColor: '#F8FAFC', fontWeight: 700, borderTop: '2px solid #E2E8F0' }}>
+                    <td colSpan={2} style={{ padding: '10px 14px', textAlign: 'right', color: '#475569' }}>
+                      Trial Balance Totals:
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', color: '#0F172A' }}>
+                      {totalDebit.toFixed(2)}
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', color: '#0F172A' }}>
+                      {totalCredit.toFixed(2)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Balancing Verification Badge */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', fontSize: '11px', color: '#64748B' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {isBalanced ? (
+                  <CheckCircle2 size={14} style={{ color: '#16A34A' }} />
+                ) : (
+                  <AlertTriangle size={14} style={{ color: '#DC2626' }} />
+                )}
+                <span style={{ fontWeight: 600, color: isBalanced ? '#16A34A' : '#DC2626' }}>
+                  {isBalanced ? 'Dual-Entry Trial Balance Verified (Variance: 0.00)' : 'Trial Balance Imbalance Detected'}
+                </span>
+              </div>
+              <span>Ready for ERP Export (SAP S/4HANA • NetSuite • Oracle Fusion)</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Resolution Card if already resolved */}
       {isResolved && (

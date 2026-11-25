@@ -12,6 +12,7 @@ import {
   User,
   LogOut,
   Shield,
+  Sliders,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ShinyText } from './reactbits/ShinyText';
@@ -183,6 +184,25 @@ export const Sidebar: React.FC = () => {
             <div style={{ margin: '16px 12px 6px', fontSize: '11px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Administration
             </div>
+
+            <NavLink
+              to="/rules"
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                color: isActive ? '#FFFFFF' : '#94A3B8',
+                backgroundColor: isActive ? 'var(--primary)' : 'transparent',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: 500,
+              })}
+            >
+              <Sliders size={18} />
+              <span>Policy & Rules</span>
+            </NavLink>
 
             <NavLink
               to="/audit-logs"

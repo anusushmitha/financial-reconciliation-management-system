@@ -21,8 +21,8 @@ test.describe('LENDGUARD AI — E2E Screen Navigation & RBAC Verification', () =
   test('Admin Journey — Screen Coverage S04 to S18', async ({ page }) => {
     // Login as Admin
     await page.goto('/login');
-    await page.fill('input[type="email"], input[name="email"]', 'admin@example.com');
-    await page.fill('input[type="password"], input[name="password"]', 'Admin123!');
+    await page.fill('input[type="email"], input[name="email"]', 'staging.admin@lendguard.internal');
+    await page.fill('input[type="password"], input[name="password"]', 'StagingAdmin_Secure2026!');
     await page.click('button[type="submit"]');
 
     // S04: Dashboard
@@ -65,8 +65,8 @@ test.describe('LENDGUARD AI — E2E Screen Navigation & RBAC Verification', () =
   test('Analyst RBAC Enforcement — Blocked from Admin Screens & APIs', async ({ page, request }) => {
     // 1. Frontend Route Guard: Login as Analyst
     await page.goto('/login');
-    await page.fill('input[type="email"], input[name="email"]', 'analyst@example.com');
-    await page.fill('input[type="password"], input[name="password"]', 'Analyst123!');
+    await page.fill('input[type="email"], input[name="email"]', 'staging.analyst@lendguard.internal');
+    await page.fill('input[type="password"], input[name="password"]', 'StagingAnalyst_Secure2026!');
     await page.click('button[type="submit"]');
     await page.waitForURL('/dashboard');
 
@@ -83,7 +83,7 @@ test.describe('LENDGUARD AI — E2E Screen Navigation & RBAC Verification', () =
     // 2. Backend Direct API RBAC Enforcement:
     // Login to get Analyst JWT token
     const loginRes = await request.post('http://localhost:5000/api/v1/auth/login', {
-      data: { email: 'analyst@example.com', password: 'Analyst123!' }
+      data: { email: 'staging.analyst@lendguard.internal', password: 'StagingAnalyst_Secure2026!' }
     });
     expect(loginRes.status()).toBe(200);
     const { accessToken: analystToken } = await loginRes.json();
@@ -117,7 +117,7 @@ test.describe('LENDGUARD AI — E2E Screen Navigation & RBAC Verification', () =
   test('Admin Forbidden Actions — Prevent Self-Deactivation & Disabling Last Admin', async ({ request }) => {
     // Login as Admin
     const loginRes = await request.post('http://localhost:5000/api/v1/auth/login', {
-      data: { email: 'admin@example.com', password: 'Admin123!' }
+      data: { email: 'staging.admin@lendguard.internal', password: 'StagingAdmin_Secure2026!' }
     });
     const { accessToken: adminToken, user: adminUser } = await loginRes.json();
 

@@ -243,7 +243,7 @@ namespace LendGuard.Api.Controllers
                 exception_id = ex.Id,
                 transaction_reference = ex.TransactionReference,
                 exception_type = ex.ExceptionType,
-                amount = (double)ex.Amount,
+                amount = ex.Amount,
                 severity = ex.Severity,
                 description = ex.Description,
                 evidence_text = ex.Evidence,
@@ -251,7 +251,7 @@ namespace LendGuard.Api.Controllers
                 {
                     reference_id = internalRecord.ReferenceId,
                     source_system = internalRecord.SourceSystem,
-                    amount = (double)internalRecord.Amount,
+                    amount = internalRecord.Amount,
                     transaction_date = internalRecord.TransactionDate.ToString("yyyy-MM-dd"),
                     currency = internalRecord.Currency,
                     type = internalRecord.Type,
@@ -261,7 +261,7 @@ namespace LendGuard.Api.Controllers
                 {
                     reference_id = externalRecord.ReferenceId,
                     source_system = externalRecord.SourceSystem,
-                    amount = (double)externalRecord.Amount,
+                    amount = externalRecord.Amount,
                     transaction_date = externalRecord.TransactionDate.ToString("yyyy-MM-dd"),
                     currency = externalRecord.Currency,
                     type = externalRecord.Type,

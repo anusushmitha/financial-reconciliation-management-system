@@ -113,4 +113,67 @@ public class AuthenticationTests
 
         Assert.Contains("inactive", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task SEC01_AdminSelfDeactivation_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var (context, _) = CreateTestSetup();
+        var auditMock = new Mock<IAuditService>();
+        var userService = new UserService(context, auditMock.Object);
+
+        var admin1 = new User
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Admin One",
+            Email = "admin1@lendguard.internal",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Pass123!"),
+            Role = UserRole.Admin,
+            IsActive = true
+        };
+        var admin2 = new User
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Admin Two",
+            Email = "admin2@lendguard.internal",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Pass123!"),
+            Role = UserRole.Admin,
+            IsActive = true
+        };
+        context.Users.AddRange(admin1, admin2);
+        await context.SaveChangesAsync();
+
+        // Act & Assert: even when another admin exists, admin1 cannot deactivate themselves
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            userService.UpdateUserStatusAsync(admin1.Id, new UpdateUserStatusRequest { IsActive = false }, admin1.Id));
+
+        Assert.Contains("own active account", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SEC02_DeactivateFinalActiveAdmin_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var (context, _) = CreateTestSetup();
+        var auditMock = new Mock<IAuditService>();
+        var userService = new UserService(context, auditMock.Object);
+
+        var onlyAdmin = new User
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Final Admin",
+            Email = "finaladmin@lendguard.internal",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Pass123!"),
+            Role = UserRole.Admin,
+            IsActive = true
+        };
+        context.Users.Add(onlyAdmin);
+        await context.SaveChangesAsync();
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            userService.UpdateUserStatusAsync(onlyAdmin.Id, new UpdateUserStatusRequest { IsActive = false }, Guid.NewGuid()));
+
+        Assert.Contains("final active administrator", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

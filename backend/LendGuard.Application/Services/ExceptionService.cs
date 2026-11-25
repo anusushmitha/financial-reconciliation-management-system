@@ -31,12 +31,14 @@ public class ExceptionService : IExceptionService
     private readonly IApplicationDbContext _context;
     private readonly IAuditService _auditService;
     private readonly IAiClientService _aiClient;
+    private readonly INotificationService? _notificationService;
 
-    public ExceptionService(IApplicationDbContext context, IAuditService auditService, IAiClientService aiClient)
+    public ExceptionService(IApplicationDbContext context, IAuditService auditService, IAiClientService aiClient, INotificationService? notificationService = null)
     {
         _context = context;
         _auditService = auditService;
         _aiClient = aiClient;
+        _notificationService = notificationService;
     }
 
     public async Task<PaginatedList<ExceptionSummaryDto>> GetExceptionsAsync(int page = 1, int pageSize = 20, string? type = null, string? severity = null, string? status = null, Guid? assignedTo = null, bool? unassignedOnly = null, Guid? currentUserId = null, string? currentUserRole = null, CancellationToken cancellationToken = default)
@@ -135,6 +137,12 @@ public class ExceptionService : IExceptionService
 
     public async Task<ExceptionDetailDto> AssignExceptionAsync(Guid id, AssignExceptionRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default)
     {
+        // Enforce analyst self-assignment authorization before database existence lookup to prevent ID enumeration
+        if (currentUserRole == UserRole.Analyst && request.AssignedTo != currentUserId)
+        {
+            throw new UnauthorizedAccessException("Analysts may only assign unassigned exceptions to themselves.");
+        }
+
         var exception = await _context.Exceptions
             .Include(e => e.Assignee)
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
@@ -144,17 +152,9 @@ public class ExceptionService : IExceptionService
             throw new KeyNotFoundException("Exception record not found.");
         }
 
-        if (currentUserRole == UserRole.Analyst)
+        if (currentUserRole == UserRole.Analyst && exception.AssignedTo.HasValue && exception.AssignedTo.Value != currentUserId)
         {
-            // Analysts can only self-assign unassigned exceptions to themselves
-            if (request.AssignedTo != currentUserId)
-            {
-                throw new UnauthorizedAccessException("Analysts may only assign unassigned exceptions to themselves.");
-            }
-            if (exception.AssignedTo.HasValue && exception.AssignedTo.Value != currentUserId)
-            {
-                throw new UnauthorizedAccessException("Cannot claim an exception already assigned to another analyst.");
-            }
+            throw new UnauthorizedAccessException("Cannot claim an exception already assigned to another analyst.");
         }
 
         var targetUser = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == request.AssignedTo, cancellationToken);
@@ -174,6 +174,11 @@ public class ExceptionService : IExceptionService
         await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync("EXCEPTION_ASSIGNED", "EXCEPTION", exception.Id, currentUserId, new { oldAssignee = oldAssigneeId, newAssignee = targetUser.Id, assigneeName = targetUser.FullName }, null, cancellationToken);
+
+        if (_notificationService != null)
+        {
+            await _notificationService.BroadcastEventAsync("EXCEPTION_ASSIGNED", "Discrepancy Assigned", $"{targetUser.FullName} was assigned discrepancy #{exception.Id.ToString()[..8]}.", new { exceptionId = exception.Id, assignedTo = targetUser.Id, assigneeName = targetUser.FullName }, cancellationToken);
+        }
 
         return await GetExceptionByIdAsync(id, currentUserId, UserRole.Admin, cancellationToken);
     }
@@ -222,6 +227,11 @@ public class ExceptionService : IExceptionService
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        if (_notificationService != null && updatedIds.Count > 0)
+        {
+            await _notificationService.BroadcastEventAsync("BATCH_ASSIGNED", "Batch Triage Complete", $"{updatedIds.Count} discrepancies were assigned to {targetUser.FullName}.", new { count = updatedIds.Count, assignedTo = targetUser.Id, assigneeName = targetUser.FullName }, cancellationToken);
+        }
 
         return new BatchAssignExceptionsResponse
         {
@@ -341,6 +351,11 @@ public class ExceptionService : IExceptionService
         await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync("EXCEPTION_RESOLVED", "EXCEPTION", exception.Id, currentUserId, new { resolutionCategory = exception.ResolutionCategory, explanation = exception.ResolutionExplanation }, null, cancellationToken);
+
+        if (_notificationService != null)
+        {
+            await _notificationService.BroadcastEventAsync("EXCEPTION_RESOLVED", "Discrepancy Resolved", $"Discrepancy #{exception.Id.ToString()[..8]} was marked {exception.ResolutionCategory}.", new { exceptionId = exception.Id, category = exception.ResolutionCategory }, cancellationToken);
+        }
 
         return await GetExceptionByIdAsync(id, currentUserId, UserRole.Admin, cancellationToken);
     }

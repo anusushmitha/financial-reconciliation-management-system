@@ -10,7 +10,7 @@ test.describe('LENDGUARD AI — Full 18-Screen End-to-End Verification Suite', (
   test.beforeAll(async ({ request }) => {
     // 1. Authenticate via backend API to harvest live entity IDs for deep screen testing
     const loginRes = await request.post('http://localhost:5000/api/v1/auth/login', {
-      data: { email: 'admin@example.com', password: 'Admin123!' }
+      data: { email: 'staging.admin@lendguard.internal', password: 'StagingAdmin_Secure2026!' }
     });
     expect(loginRes.status()).toBe(200);
     const loginData = await loginRes.json();
@@ -87,8 +87,8 @@ test.describe('LENDGUARD AI — Full 18-Screen End-to-End Verification Suite', (
   test('Comprehensive Interactive Journey — S04 to S18', async ({ page }) => {
     // S01 -> S04: Login as Admin
     await page.goto('/login');
-    await page.fill('input[type="email"], input[name="email"]', 'admin@example.com');
-    await page.fill('input[type="password"], input[name="password"]', 'Admin123!');
+    await page.fill('input[type="email"], input[name="email"]', 'staging.admin@lendguard.internal');
+    await page.fill('input[type="password"], input[name="password"]', 'StagingAdmin_Secure2026!');
     await page.click('button[type="submit"]');
     await page.waitForURL('/dashboard');
     await expect(page).toHaveURL('/dashboard');
@@ -152,7 +152,7 @@ test.describe('LENDGUARD AI — Full 18-Screen End-to-End Verification Suite', (
     if (sampleExceptionId) {
       await page.goto(`/exceptions/${sampleExceptionId}`);
       await expect(page).toHaveURL(`/exceptions/${sampleExceptionId}`);
-      await expect(page.locator('h3:has-text("AI Advisory Investigation Assistant")')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('h3:has-text("Dual-Engine AI Intelligence Center")')).toBeVisible({ timeout: 5000 });
       await expect(page.locator('h3:has-text("Investigation Notes")')).toBeVisible({ timeout: 5000 });
 
       // Post Note Verification
@@ -206,8 +206,8 @@ test.describe('LENDGUARD AI — Full 18-Screen End-to-End Verification Suite', (
   test('Analyst Role Restrictions — Route Guards & Backend RBAC', async ({ page, request }) => {
     // 1. Frontend Route Guard: Login as Analyst
     await page.goto('/login');
-    await page.fill('input[type="email"], input[name="email"]', 'analyst@example.com');
-    await page.fill('input[type="password"], input[name="password"]', 'Analyst123!');
+    await page.fill('input[type="email"], input[name="email"]', 'staging.analyst@lendguard.internal');
+    await page.fill('input[type="password"], input[name="password"]', 'StagingAnalyst_Secure2026!');
     await page.click('button[type="submit"]');
     await page.waitForURL('/dashboard');
 
@@ -223,7 +223,7 @@ test.describe('LENDGUARD AI — Full 18-Screen End-to-End Verification Suite', (
 
     // 2. Direct API RBAC Protection
     const loginRes = await request.post('http://localhost:5000/api/v1/auth/login', {
-      data: { email: 'analyst@example.com', password: 'Analyst123!' }
+      data: { email: 'staging.analyst@lendguard.internal', password: 'StagingAnalyst_Secure2026!' }
     });
     const { accessToken: analystToken } = await loginRes.json();
 

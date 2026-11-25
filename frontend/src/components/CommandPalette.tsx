@@ -124,6 +124,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
       },
     },
     {
+      id: 'nav-rules',
+      title: 'Policy & Rule Builder',
+      subtitle: 'Tune tolerance thresholds, date buffers, and IsolationForest sensitivity',
+      category: 'Navigation',
+      icon: Sliders,
+      action: () => {
+        navigate('/rules');
+        onClose();
+      },
+    },
+    {
       id: 'nav-reports',
       title: 'Reports & Analytics',
       subtitle: 'Detailed reconciliation and exception performance reports',

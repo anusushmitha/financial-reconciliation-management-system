@@ -94,6 +94,14 @@ export const ExceptionDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    const onRealtime = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.eventType === 'SYSTEM_RESEEDED' || detail.data?.exceptionId === id || detail.eventType === 'BATCH_ASSIGNED') {
+        loadData();
+      }
+    };
+    window.addEventListener('lendguard:realtime', onRealtime);
+    return () => window.removeEventListener('lendguard:realtime', onRealtime);
   }, [id]);
 
   const handlePostNote = async (e: React.FormEvent) => {
@@ -482,9 +490,15 @@ export const ExceptionDetailPage: React.FC = () => {
                     const riskColors = {
                       CRITICAL: { bg: '#FEF2F2', border: '#FECACA', text: '#991B1B', bar: '#DC2626' },
                       HIGH: { bg: '#FFFBEB', border: '#FDE68A', text: '#92400E', bar: '#D97706' },
+                      MEDIUM: { bg: '#EFF6FF', border: '#BFDBFE', text: '#1E40AF', bar: '#2563EB' },
                       MODERATE: { bg: '#EFF6FF', border: '#BFDBFE', text: '#1E40AF', bar: '#2563EB' },
                       LOW: { bg: '#F0FDF4', border: '#BBF7D0', text: '#166534', bar: '#16A34A' },
-                    }[riskLevel as 'CRITICAL' | 'HIGH' | 'MODERATE' | 'LOW'] || { bg: '#F8FAFC', border: '#E2E8F0', text: '#334155', bar: '#64748B' };
+                    }[riskLevel as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'MODERATE' | 'LOW'] || { bg: '#F8FAFC', border: '#E2E8F0', text: '#334155', bar: '#64748B' };
+
+                    const savedPolicyRaw = localStorage.getItem('lendguard_matching_policy');
+                    const outlierPctThreshold = savedPolicyRaw
+                      ? Math.round((JSON.parse(savedPolicyRaw).isolationForestOutlierThreshold ?? 0.75) * 100)
+                      : 60;
 
                     return (
                       <div>
@@ -527,7 +541,7 @@ export const ExceptionDetailPage: React.FC = () => {
                               {riskLevel} RISK
                             </span>
                             <div style={{ fontSize: '11px', color: riskColors.text, marginTop: '4px' }}>
-                              {pct >= 60 ? 'Requires Immediate Review' : 'Standard Variance'}
+                              {pct >= outlierPctThreshold ? 'Requires Immediate Review' : 'Standard Variance'}
                             </div>
                           </div>
                         </div>

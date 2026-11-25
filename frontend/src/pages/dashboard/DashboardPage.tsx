@@ -25,7 +25,6 @@ import {
   Tooltip,
   BarChart,
   Bar,
-  Legend,
 } from 'recharts';
 import { SpotlightCard } from '../../components/reactbits/SpotlightCard';
 import { AnimatedCounter } from '../../components/reactbits/AnimatedCounter';
@@ -61,6 +60,9 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    const onRealtime = () => loadData();
+    window.addEventListener('lendguard:realtime', onRealtime);
+    return () => window.removeEventListener('lendguard:realtime', onRealtime);
   }, []);
 
   const handleRefresh = () => {

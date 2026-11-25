@@ -57,6 +57,11 @@ export const AuditHistoryPage: React.FC = () => {
     if (isAdmin) {
       loadLogs();
     }
+    const onRealtime = () => {
+      if (isAdmin) loadLogs();
+    };
+    window.addEventListener('lendguard:realtime', onRealtime);
+    return () => window.removeEventListener('lendguard:realtime', onRealtime);
   }, [isAdmin, action, entityType, page]);
 
   if (!isAdmin) {
@@ -94,7 +99,7 @@ export const AuditHistoryPage: React.FC = () => {
         <input
           type="text"
           className="form-control"
-          placeholder="Filter by entity type (e.g. DiscrepancyException)..."
+          placeholder="Filter by entity type (e.g. EXCEPTION, USER, IMPORT_BATCH, SYSTEM_POLICY)..."
           value={entityType}
           onChange={(e) => {
             setEntityType(e.target.value);

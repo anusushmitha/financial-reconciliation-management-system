@@ -79,11 +79,11 @@ export const StatusBadge: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ 
   const norm = (status || '').toUpperCase();
   let variant: BadgeProps['variant'] = 'neutral';
 
-  if (['COMPLETED', 'RESOLVED', 'CONFIRMED', 'MATCHED', 'VALIDATED', 'ACTIVE'].includes(norm)) {
+  if (['COMPLETED', 'RESOLVED', 'CONFIRMED', 'IMPORTED', 'MATCHED', 'VALIDATED', 'ACTIVE'].includes(norm)) {
     variant = 'success';
-  } else if (['PROCESSING', 'IN_PROGRESS', 'QUEUED'].includes(norm)) {
+  } else if (['PROCESSING', 'IN_PROGRESS', 'QUEUED', 'VALIDATION_COMPLETED', 'VALIDATING', 'RECEIVED'].includes(norm)) {
     variant = 'info';
-  } else if (['PENDING', 'DRAFT', 'WARNING', 'MEDIUM', 'ANOMALY'].includes(norm)) {
+  } else if (['PENDING', 'DRAFT', 'WARNING', 'MEDIUM', 'PARTIALLY_IMPORTED', 'ANOMALY'].includes(norm)) {
     variant = 'warning';
   } else if (['FAILED', 'REJECTED', 'CRITICAL', 'HIGH', 'EXCEPTION', 'UNMATCHED'].includes(norm)) {
     variant = 'danger';

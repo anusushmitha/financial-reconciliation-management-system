@@ -32,6 +32,7 @@ export const ReconciliationListPage: React.FC = () => {
   const [externalBatches, setExternalBatches] = useState<ImportBatchSummary[]>([]);
   const [selectedInternal, setSelectedInternal] = useState<string>('');
   const [selectedExternal, setSelectedExternal] = useState<string>('');
+  const [activePolicy, setActivePolicy] = useState<{ amountTolerancePercent: number; fixedRupeeTolerance: number; dateSlippageDays: number; selectedPreset: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -52,22 +53,37 @@ export const ReconciliationListPage: React.FC = () => {
 
   useEffect(() => {
     loadRuns();
+    const onRealtime = () => loadRuns();
+    window.addEventListener('lendguard:realtime', onRealtime);
+    return () => window.removeEventListener('lendguard:realtime', onRealtime);
   }, []);
 
   const openStartModal = async () => {
     try {
       setModalError(null);
       setShowModal(true);
-      const [intRes, extRes] = await Promise.all([
-        api.getImportBatches({ sourceType: 'INTERNAL', status: 'CONFIRMED', pageSize: 50 }),
-        api.getImportBatches({ sourceType: 'EXTERNAL', status: 'CONFIRMED', pageSize: 50 }),
+      const [intRes, extRes, policyRes] = await Promise.all([
+        api.getImportBatches({ sourceType: 'INTERNAL', pageSize: 100 }),
+        api.getImportBatches({ sourceType: 'EXTERNAL', pageSize: 100 }),
+        api.getPolicy().catch(() => null),
       ]);
-      setInternalBatches(intRes.items);
-      setExternalBatches(extRes.items);
-      if (intRes.items.length > 0) setSelectedInternal(intRes.items[0].id);
-      if (extRes.items.length > 0) setSelectedExternal(extRes.items[0].id);
+      const readyStatuses = ['IMPORTED', 'PARTIALLY_IMPORTED', 'CONFIRMED'];
+      const readyInternal = intRes.items.filter((b) => readyStatuses.includes((b.status || '').toUpperCase()));
+      const readyExternal = extRes.items.filter((b) => readyStatuses.includes((b.status || '').toUpperCase()));
+      setInternalBatches(readyInternal);
+      setExternalBatches(readyExternal);
+      setSelectedInternal(readyInternal.length > 0 ? readyInternal[0].id : '');
+      setSelectedExternal(readyExternal.length > 0 ? readyExternal[0].id : '');
+      if (policyRes) {
+        setActivePolicy({
+          amountTolerancePercent: Number(policyRes.amountTolerancePercent ?? 0),
+          fixedRupeeTolerance: Number(policyRes.fixedRupeeTolerance ?? 0),
+          dateSlippageDays: Number(policyRes.dateSlippageDays ?? 0),
+          selectedPreset: policyRes.selectedPreset || 'strict',
+        });
+      }
     } catch (err: any) {
-      setModalError('Failed to retrieve confirmed batches for reconciliation.');
+      setModalError('Failed to retrieve imported batches for reconciliation.');
     }
   };
 
@@ -130,7 +146,7 @@ export const ReconciliationListPage: React.FC = () => {
           <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
             Reconciliation Execution History
           </h3>
-          <ShinyText text="Deterministic Rules v1.0" speed={3.5} />
+          <ShinyText text="Deterministic Rules v2.0" speed={3.5} />
         </div>
 
         {loading ? (
@@ -278,16 +294,22 @@ export const ReconciliationListPage: React.FC = () => {
 
           <div style={{ padding: '14px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748B' }}>Reconciliation Engine Rule Set:</span>
-              <span style={{ fontWeight: 600 }}>RC-01 - RC-08 (v2.0 Deterministic)</span>
+              <span style={{ color: '#64748B' }}>Active Policy Profile:</span>
+              <span style={{ fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)' }}>
+                {activePolicy?.selectedPreset || 'strict'} (RC-01 – RC-08 v2.0)
+              </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#64748B' }}>Date Tolerance Window:</span>
-              <span style={{ fontWeight: 600 }}>±2 Calendar Days</span>
+              <span style={{ fontWeight: 600 }}>±{activePolicy?.dateSlippageDays ?? 0} Calendar Days</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748B' }}>Amount Precision:</span>
-              <span style={{ fontWeight: 600 }}>Exact Decimal (0.00 Tolerance)</span>
+              <span style={{ color: '#64748B' }}>Amount Tolerance:</span>
+              <span style={{ fontWeight: 600 }}>
+                {activePolicy && (activePolicy.amountTolerancePercent > 0 || activePolicy.fixedRupeeTolerance > 0)
+                  ? `±${activePolicy.amountTolerancePercent.toFixed(2)}% / ₹${activePolicy.fixedRupeeTolerance.toFixed(2)} Cap`
+                  : 'Exact Decimal (0.00 Tolerance)'}
+              </span>
             </div>
           </div>
         </form>

@@ -553,7 +553,7 @@ export const ImportsPage: React.FC = () => {
                             navigate(`/imports/${b.id}/validation`);
                           }}
                         >
-                          {b.status === 'VALIDATED' ? 'Review & Confirm' : 'View Details'}
+                          {b.status === 'VALIDATION_COMPLETED' || b.status === 'VALIDATED' ? 'Review & Confirm' : 'View Details'}
                         </button>
                       </td>
                     </tr>

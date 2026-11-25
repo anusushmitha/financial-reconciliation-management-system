@@ -150,4 +150,27 @@ test.describe('LENDGUARD AI — Enterprise Max-Roof Capabilities E2E Verificatio
     await page.getByRole('button', { name: 'Close' }).click();
     expect(errors).toEqual([]);
   });
+
+  test('06. New Reconciliation Run Modal Populates Real IMPORTED Batches & Active DB Policy', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err) => errors.push(err.message));
+
+    await page.goto(`${BASE_URL}/reconciliation-runs`);
+    await expect(page.getByText('Reconciliation Execution History')).toBeVisible();
+
+    await page.getByRole('button', { name: /New Reconciliation Run/i }).click();
+    await expect(page.getByText('Execute Reconciliation Run')).toBeVisible();
+    await expect(page.getByText(/Active Policy Profile:/i)).toBeVisible();
+
+    // Verify genuine IMPORTED batches appear in both Internal and External selects (not broken "CONFIRMED" empty state)
+    const internalOptions = await page.locator('form select').nth(0).locator('option').allTextContents();
+    const externalOptions = await page.locator('form select').nth(1).locator('option').allTextContents();
+    expect(internalOptions.length).toBeGreaterThan(0);
+    expect(externalOptions.length).toBeGreaterThan(0);
+    expect(internalOptions[0]).not.toContain('No confirmed internal batches available');
+    expect(externalOptions[0]).not.toContain('No confirmed external batches available');
+
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    expect(errors).toEqual([]);
+  });
 });

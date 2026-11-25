@@ -90,7 +90,7 @@ export const ValidationResultsPage: React.FC = () => {
     );
   }
 
-  const isConfirmed = batch?.status === 'CONFIRMED';
+  const isConfirmed = ['IMPORTED', 'PARTIALLY_IMPORTED', 'CONFIRMED'].includes((batch?.status || '').toUpperCase());
   const totalErrorPages = valData ? Math.ceil(valData.totalCount / valData.pageSize) || 1 : 1;
 
   return (

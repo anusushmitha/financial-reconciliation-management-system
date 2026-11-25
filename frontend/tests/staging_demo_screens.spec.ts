@@ -73,7 +73,8 @@ test.describe('LENDGUARD AI — Staging Stakeholder Demonstration Browser Verifi
     await page.click('button[type="submit"]');
     await page.waitForURL('**/dashboard');
 
-    await page.goto(`${BASE_URL}/reconciliation`);
+    await page.goto(`${BASE_URL}/reconciliation-runs`);
+    await expect(page).toHaveURL(/reconciliation-runs/);
     await expect(page.locator('h1, h2, h3').filter({ hasText: /Reconciliation/i }).first()).toBeVisible();
     await page.screenshot({ path: 'test-results/demo_03_reconciliation.png' });
   });

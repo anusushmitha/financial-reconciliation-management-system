@@ -143,6 +143,12 @@ export const ExceptionListPage: React.FC = () => {
   useEffect(() => {
     loadExceptions();
     loadCounts();
+    const onRealtime = () => {
+      loadExceptions();
+      loadCounts();
+    };
+    window.addEventListener('lendguard:realtime', onRealtime);
+    return () => window.removeEventListener('lendguard:realtime', onRealtime);
   }, [activeTab, status, severity, exceptionType, selectedAssigneeFilter, page, user]);
 
   const totalPages = Math.ceil(totalCount / pageSize) || 1;

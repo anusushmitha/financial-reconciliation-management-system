@@ -213,8 +213,13 @@ function Start-LendGuard {
             -WindowStyle Hidden -PassThru
         $Pids["postgres"] = $pgProc.Id
 
-        $ready = Wait-ForCondition "PostgreSQL 16 (Port 5433)" { Test-PortListening 5433 } -TimeoutSeconds 15
+        $ready = Wait-ForCondition "PostgreSQL 16 (Port 5433)" {
+            if (-not (Test-PortListening 5433)) { return $false }
+            & "C:\Program Files\PostgreSQL\16\bin\pg_isready.exe" -p 5433 -q
+            return ($LASTEXITCODE -eq 0)
+        } -TimeoutSeconds 20
         if (-not $ready) { Write-Host "  [ERROR] PostgreSQL failed to initialize. Check $pgErr" -ForegroundColor Red; exit 1 }
+        Start-Sleep -Milliseconds 600
     }
 
     # 2. Python AI Service

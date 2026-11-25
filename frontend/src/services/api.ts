@@ -281,6 +281,13 @@ class ApiService {
     });
   }
 
+  async batchAssignExceptions(exceptionIds: string[], assignedTo: string): Promise<{ assignedCount: number; updatedIds: string[] }> {
+    return this.request<{ assignedCount: number; updatedIds: string[] }>('/exceptions/batch-assignment', {
+      method: 'POST',
+      body: JSON.stringify({ exceptionIds, assignedTo }),
+    });
+  }
+
   async getExceptionNotes(id: string): Promise<InvestigationNote[]> {
     return this.request<InvestigationNote[]>(`/exceptions/${id}/notes`);
   }

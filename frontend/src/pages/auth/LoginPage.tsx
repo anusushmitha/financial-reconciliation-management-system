@@ -34,13 +34,24 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const fillCredentials = (role: 'admin' | 'analyst') => {
-    if (role === 'admin') {
-      setEmail('admin@example.com');
-      setPassword('Admin123!');
-    } else {
-      setEmail('analyst@example.com');
-      setPassword('Analyst123!');
+  const fillCredentials = (preset: 'admin' | 'analyst' | 'anu' | 'co_admin') => {
+    switch (preset) {
+      case 'admin':
+        setEmail('staging.admin@lendguard.internal');
+        setPassword('StagingAdmin_Secure2026!');
+        break;
+      case 'analyst':
+        setEmail('staging.analyst@lendguard.internal');
+        setPassword('StagingAnalyst_Secure2026!');
+        break;
+      case 'anu':
+        setEmail('sanushusmitha@gmail.com');
+        setPassword('Analyst123!');
+        break;
+      case 'co_admin':
+        setEmail('admin@example.com');
+        setPassword('Admin123!');
+        break;
     }
   };
 
@@ -149,7 +160,7 @@ export const LoginPage: React.FC = () => {
       {/* Quick Demo Credential Presets with Astryx Tokens */}
       <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #E2E8F0', textAlign: 'center' }}>
         <p style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-          One-Click Demo Credentials
+          One-Click Authorized Persona Switcher
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           <button
@@ -159,7 +170,7 @@ export const LoginPage: React.FC = () => {
             onClick={() => fillCredentials('admin')}
           >
             <span style={{ fontWeight: 600, color: 'var(--primary)' }}>Administrator</span>
-            <span style={{ fontSize: '10px', color: '#94A3B8' }}>Full System Control</span>
+            <span style={{ fontSize: '10px', color: '#94A3B8' }}>staging.admin (Full Control)</span>
           </button>
           <button
             type="button"
@@ -167,8 +178,26 @@ export const LoginPage: React.FC = () => {
             style={{ fontSize: '12px', padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', backgroundColor: '#F8FAFC' }}
             onClick={() => fillCredentials('analyst')}
           >
-            <span style={{ fontWeight: 600, color: '#16A34A' }}>Operations Analyst</span>
-            <span style={{ fontSize: '10px', color: '#94A3B8' }}>Exceptions & AI Review</span>
+            <span style={{ fontWeight: 600, color: '#16A34A' }}>Operational Analyst</span>
+            <span style={{ fontSize: '10px', color: '#94A3B8' }}>staging.analyst (Queue)</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: '12px', padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', backgroundColor: '#F8FAFC' }}
+            onClick={() => fillCredentials('anu')}
+          >
+            <span style={{ fontWeight: 600, color: '#8B5CF6' }}>Anu Sushmitha</span>
+            <span style={{ fontSize: '10px', color: '#94A3B8' }}>sanushusmitha@gmail.com</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: '12px', padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', backgroundColor: '#F8FAFC' }}
+            onClick={() => fillCredentials('co_admin')}
+          >
+            <span style={{ fontWeight: 600, color: '#0284C7' }}>Dev Admin</span>
+            <span style={{ fontSize: '10px', color: '#94A3B8' }}>admin@example.com</span>
           </button>
         </div>
       </div>

@@ -13,45 +13,91 @@ public static class DatabaseSeeder
 {
     public static async Task SeedAsync(LendGuardDbContext context, ILogger logger, IConfiguration? configuration = null)
     {
-        var seedEnabled = configuration == null || !string.Equals(configuration["SEED_TEST_USERS"], "false", StringComparison.OrdinalIgnoreCase);
-        if (!seedEnabled)
+        logger.LogInformation("Ensuring standard enterprise users and active workloads are seeded...");
+
+        var defaultAccounts = new[]
         {
-            logger.LogInformation("SEED_TEST_USERS is set to false. Skipping default test user seeding for production/staging security.");
-            return;
+            new { Id = Guid.Parse("5671a1c9-07e4-4239-81cc-20287f5bdb39"), Name = "Staging Enterprise Administrator", Email = "staging.admin@lendguard.internal", Password = "StagingAdmin_Secure2026!", Role = UserRole.Admin },
+            new { Id = Guid.Parse("fc803e91-9e96-436b-8634-a817a4324f0f"), Name = "Staging Operational Analyst", Email = "staging.analyst@lendguard.internal", Password = "StagingAnalyst_Secure2026!", Role = UserRole.Analyst },
+            new { Id = Guid.Parse("0bacefdb-b578-4289-8667-c6ff227df176"), Name = "Anu Sushmitha", Email = "sanushusmitha@gmail.com", Password = "Analyst123!", Role = UserRole.Analyst },
+            new { Id = Guid.Parse("e7f2ded3-5736-421e-8440-e9e9000ffa8b"), Name = "Admin User", Email = "admin@example.com", Password = "Admin123!", Role = UserRole.Admin },
+            new { Id = Guid.Parse("c1520d9b-c95b-495c-ace4-50b0ce9e22da"), Name = "Analyst User", Email = "analyst@example.com", Password = "Analyst123!", Role = UserRole.Analyst },
+        };
+
+        foreach (var acc in defaultAccounts)
+        {
+            var existing = await context.Users.FirstOrDefaultAsync(u => u.Email == acc.Email);
+            if (existing == null)
+            {
+                var newUser = new User
+                {
+                    Id = acc.Id,
+                    FullName = acc.Name,
+                    Email = acc.Email,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(acc.Password),
+                    Role = acc.Role,
+                    IsActive = true,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+                context.Users.Add(newUser);
+            }
+            else
+            {
+                existing.FullName = acc.Name;
+                existing.IsActive = true;
+                existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(acc.Password);
+                existing.UpdatedAt = DateTimeOffset.UtcNow;
+            }
         }
 
-        // 1. Seed Users if none exist
-        if (!await context.Users.AnyAsync())
+        await context.SaveChangesAsync();
+        logger.LogInformation("Core user accounts verified and synchronized.");
+
+        // Ensure active assignment queue has starter items for presentation
+        var anuUser = await context.Users.FirstOrDefaultAsync(u => u.Email == "sanushusmitha@gmail.com");
+        var opUser = await context.Users.FirstOrDefaultAsync(u => u.Email == "staging.analyst@lendguard.internal");
+
+        if (anuUser != null)
         {
-            logger.LogInformation("Seeding initial users (admin@example.com and analyst@example.com)...");
-
-            var adminUser = new User
+            var anuCount = await context.Exceptions.CountAsync(e => e.AssignedTo == anuUser.Id && (e.Status == ExceptionStatus.Open || e.Status == ExceptionStatus.InProgress));
+            if (anuCount < 2)
             {
-                Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
-                FullName = "Admin User",
-                Email = "admin@example.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
-                Role = UserRole.Admin,
-                IsActive = true,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
+                var unassigned = await context.Exceptions
+                    .Where(e => e.AssignedTo == null && e.Status == ExceptionStatus.Open)
+                    .Take(3)
+                    .ToListAsync();
 
-            var analystUser = new User
+                foreach (var ex in unassigned)
+                {
+                    ex.AssignedTo = anuUser.Id;
+                    ex.Status = ExceptionStatus.InProgress;
+                    ex.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+                await context.SaveChangesAsync();
+                logger.LogInformation("Assigned starter demonstration exceptions to Anu Sushmitha.");
+            }
+        }
+
+        if (opUser != null)
+        {
+            var opCount = await context.Exceptions.CountAsync(e => e.AssignedTo == opUser.Id && (e.Status == ExceptionStatus.Open || e.Status == ExceptionStatus.InProgress));
+            if (opCount < 2)
             {
-                Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
-                FullName = "Analyst User",
-                Email = "analyst@example.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Analyst123!"),
-                Role = UserRole.Analyst,
-                IsActive = true,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
+                var unassigned = await context.Exceptions
+                    .Where(e => e.AssignedTo == null && e.Status == ExceptionStatus.Open)
+                    .Take(3)
+                    .ToListAsync();
 
-            context.Users.AddRange(adminUser, analystUser);
-            await context.SaveChangesAsync();
-            logger.LogInformation("Seeded default Admin and Analyst accounts.");
+                foreach (var ex in unassigned)
+                {
+                    ex.AssignedTo = opUser.Id;
+                    ex.Status = ExceptionStatus.InProgress;
+                    ex.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+                await context.SaveChangesAsync();
+                logger.LogInformation("Assigned starter demonstration exceptions to Staging Operational Analyst.");
+            }
         }
     }
 }

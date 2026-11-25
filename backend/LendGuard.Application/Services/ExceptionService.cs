@@ -18,6 +18,7 @@ public interface IExceptionService
     Task<PaginatedList<ExceptionSummaryDto>> GetExceptionsAsync(int page = 1, int pageSize = 20, string? type = null, string? severity = null, string? status = null, Guid? assignedTo = null, bool? unassignedOnly = null, Guid? currentUserId = null, string? currentUserRole = null, CancellationToken cancellationToken = default);
     Task<ExceptionDetailDto> GetExceptionByIdAsync(Guid id, Guid currentUserId, string currentUserRole, CancellationToken cancellationToken = default);
     Task<ExceptionDetailDto> AssignExceptionAsync(Guid id, AssignExceptionRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default);
+    Task<BatchAssignExceptionsResponse> BatchAssignExceptionsAsync(BatchAssignExceptionsRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default);
     Task<List<InvestigationNoteDto>> GetExceptionNotesAsync(Guid id, CancellationToken cancellationToken = default);
     Task<InvestigationNoteDto> AddInvestigationNoteAsync(Guid id, AddInvestigationNoteRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default);
     Task<ExceptionDetailDto> ResolveExceptionAsync(Guid id, ResolveExceptionRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default);
@@ -175,6 +176,58 @@ public class ExceptionService : IExceptionService
         await _auditService.LogAsync("EXCEPTION_ASSIGNED", "EXCEPTION", exception.Id, currentUserId, new { oldAssignee = oldAssigneeId, newAssignee = targetUser.Id, assigneeName = targetUser.FullName }, null, cancellationToken);
 
         return await GetExceptionByIdAsync(id, currentUserId, UserRole.Admin, cancellationToken);
+    }
+
+    public async Task<BatchAssignExceptionsResponse> BatchAssignExceptionsAsync(BatchAssignExceptionsRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default)
+    {
+        if (request.ExceptionIds == null || request.ExceptionIds.Count == 0)
+        {
+            return new BatchAssignExceptionsResponse { AssignedCount = 0 };
+        }
+
+        var targetUser = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == request.AssignedTo, cancellationToken);
+        if (targetUser == null || !targetUser.IsActive)
+        {
+            throw new ArgumentException("Target assignee must be an active registered user.");
+        }
+
+        if (currentUserRole == UserRole.Analyst && request.AssignedTo != currentUserId)
+        {
+            throw new UnauthorizedAccessException("Analysts may only batch assign unassigned items to themselves.");
+        }
+
+        var exceptions = await _context.Exceptions
+            .Where(e => request.ExceptionIds.Contains(e.Id))
+            .ToListAsync(cancellationToken);
+
+        var updatedIds = new List<Guid>();
+        foreach (var ex in exceptions)
+        {
+            if (currentUserRole == UserRole.Analyst && ex.AssignedTo.HasValue && ex.AssignedTo.Value != currentUserId)
+            {
+                // Skip items assigned to someone else for analyst
+                continue;
+            }
+
+            var oldAssignee = ex.AssignedTo;
+            ex.AssignedTo = targetUser.Id;
+            if (ex.Status == ExceptionStatus.Open)
+            {
+                ex.Status = ExceptionStatus.InProgress;
+            }
+            ex.UpdatedAt = DateTimeOffset.UtcNow;
+            updatedIds.Add(ex.Id);
+
+            await _auditService.LogAsync("EXCEPTION_ASSIGNED", "EXCEPTION", ex.Id, currentUserId, new { oldAssignee = oldAssignee, newAssignee = targetUser.Id, assigneeName = targetUser.FullName, batch = true }, null, cancellationToken);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new BatchAssignExceptionsResponse
+        {
+            AssignedCount = updatedIds.Count,
+            UpdatedIds = updatedIds
+        };
     }
 
     public async Task<List<InvestigationNoteDto>> GetExceptionNotesAsync(Guid id, CancellationToken cancellationToken = default)

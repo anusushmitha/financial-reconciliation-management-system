@@ -47,3 +47,4 @@ backend/LendGuard.Api/storage/
 logs/
 pgdata/
 *.log
+scratch/

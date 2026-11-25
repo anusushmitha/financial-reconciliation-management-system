@@ -53,6 +53,14 @@ public class ExceptionsController : ApiControllerBase
         return Ok(result);
     }
 
+    [HttpPost("batch-assignment")]
+    [Authorize(Roles = $"{UserRole.Admin},{UserRole.Analyst}")]
+    public async Task<ActionResult<BatchAssignExceptionsResponse>> BatchAssignExceptions([FromBody] BatchAssignExceptionsRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _exceptionService.BatchAssignExceptionsAsync(request, CurrentUserId, CurrentUserRole, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("{id}/notes")]
     public async Task<ActionResult<List<InvestigationNoteDto>>> GetNotes(Guid id, CancellationToken cancellationToken)
     {

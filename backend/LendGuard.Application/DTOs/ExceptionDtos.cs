@@ -44,6 +44,18 @@ public class AssignExceptionRequest
     public Guid AssignedTo { get; set; }
 }
 
+public class BatchAssignExceptionsRequest
+{
+    public List<Guid> ExceptionIds { get; set; } = new();
+    public Guid AssignedTo { get; set; }
+}
+
+public class BatchAssignExceptionsResponse
+{
+    public int AssignedCount { get; set; }
+    public List<Guid> UpdatedIds { get; set; } = new();
+}
+
 public class AddInvestigationNoteRequest
 {
     public string Note { get; set; } = string.Empty;

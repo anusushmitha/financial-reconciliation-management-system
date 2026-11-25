@@ -20,7 +20,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   isCompact = false,
   onToggleDensity,
 }) => {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -138,6 +138,45 @@ export const Topbar: React.FC<TopbarProps> = ({
             <ShinyText text="AI CLUSTER ONLINE • 14ms" speed={3} />
           </span>
         </div>
+
+        {/* Quick Demo Persona Switcher */}
+        <select
+          onChange={async (e) => {
+            const val = e.target.value;
+            if (!val) return;
+            try {
+              if (val === 'admin') {
+                await login('staging.admin@lendguard.internal', 'StagingAdmin_Secure2026!');
+              } else if (val === 'op_analyst') {
+                await login('staging.analyst@lendguard.internal', 'StagingAnalyst_Secure2026!');
+              } else if (val === 'anu') {
+                await login('sanushusmitha@gmail.com', 'Analyst123!');
+              }
+              window.location.reload();
+            } catch (err) {
+              console.error('Failed to switch persona', err);
+            }
+          }}
+          value=""
+          style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            padding: '5px 8px',
+            borderRadius: '6px',
+            border: '1px solid #CBD5E1',
+            backgroundColor: '#F8FAFC',
+            color: '#334155',
+            cursor: 'pointer',
+          }}
+          title="Switch Active Persona Instantly"
+        >
+          <option value="" disabled>
+            ⚡ Switch Persona
+          </option>
+          <option value="admin">Admin (Full Control)</option>
+          <option value="op_analyst">Operational Analyst</option>
+          <option value="anu">Anu Sushmitha (Analyst)</option>
+        </select>
 
         {/* User Card */}
         {user && (

@@ -636,4 +636,97 @@ public class ReconciliationEngineTests
         Assert.Single(exceptions);
         Assert.Equal(ExceptionType.AmbiguousMatch, exceptions[0].ExceptionType);
     }
+
+    [Fact]
+    public async Task POL01_ActivePolicyTolerance_MatchesWithinPolicyVarianceCap_AndFlagsOutsideCap()
+    {
+        // Arrange
+        var (context, service) = CreateTestSetup();
+        var adminId = Guid.NewGuid();
+        var (intBatch, extBatch) = SeedBatches(context, adminId);
+
+        // Seed Commercial Policy: +/- 0.25% or Cap 50.00, 3 days slippage
+        context.ReconciliationPolicies.Add(new ReconciliationPolicy
+        {
+            Id = Guid.NewGuid(),
+            ProfileId = "fintech",
+            AmountTolerancePercent = 0.25m,
+            FixedRupeeTolerance = 50.00m,
+            DateSlippageDays = 3
+        });
+
+        var intWithin = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            ImportBatchId = intBatch.Id,
+            SourceRowNumber = 1,
+            TransactionReference = "TXN-POL-IN",
+            TransactionDate = DateTimeOffset.Parse("2026-11-10T10:00:00Z"),
+            Amount = 10000.00m,
+            Currency = "INR",
+            SourceType = SourceType.Internal,
+            Status = TransactionStatus.Pending
+        };
+
+        var extWithin = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            ImportBatchId = extBatch.Id,
+            SourceRowNumber = 1,
+            TransactionReference = "EXT-POL-IN",
+            ExternalReference = "TXN-POL-IN",
+            TransactionDate = DateTimeOffset.Parse("2026-11-12T10:00:00Z"), // 2 days <= 3d
+            Amount = 9975.00m, // Diff 25.00 <= 50.00 cap
+            Currency = "INR",
+            SourceType = SourceType.External,
+            Status = TransactionStatus.Pending
+        };
+
+        var intOutside = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            ImportBatchId = intBatch.Id,
+            SourceRowNumber = 2,
+            TransactionReference = "TXN-POL-OUT",
+            TransactionDate = DateTimeOffset.Parse("2026-11-10T10:00:00Z"),
+            Amount = 10000.00m,
+            Currency = "INR",
+            SourceType = SourceType.Internal,
+            Status = TransactionStatus.Pending
+        };
+
+        var extOutside = new Transaction
+        {
+            Id = Guid.NewGuid(),
+            ImportBatchId = extBatch.Id,
+            SourceRowNumber = 2,
+            TransactionReference = "EXT-POL-OUT",
+            ExternalReference = "TXN-POL-OUT",
+            TransactionDate = DateTimeOffset.Parse("2026-11-10T10:00:00Z"),
+            Amount = 9500.00m, // Diff 500.00 > 50.00 cap
+            Currency = "INR",
+            SourceType = SourceType.External,
+            Status = TransactionStatus.Pending
+        };
+
+        context.Transactions.AddRange(intWithin, extWithin, intOutside, extOutside);
+        await context.SaveChangesAsync();
+
+        // Act: Queue and Execute (reads policy from DB)
+        var queueRes = await service.QueueReconciliationAsync(new StartReconciliationRequest
+        {
+            InternalBatchId = intBatch.Id,
+            ExternalBatchId = extBatch.Id
+        }, adminId);
+        await service.ExecuteReconciliationRunAsync(queueRes.RunId);
+
+        // Assert
+        var matches = await context.ReconciliationMatches.Where(m => m.ReconciliationRunId == queueRes.RunId).ToListAsync();
+        Assert.Single(matches);
+
+        var exceptions = await context.Exceptions.Where(e => e.ReconciliationRunId == queueRes.RunId).ToListAsync();
+        Assert.Single(exceptions);
+        Assert.Equal(ExceptionType.AmountMismatch, exceptions[0].ExceptionType);
+        Assert.Equal(500.00m, exceptions[0].DiscrepancyAmount);
+    }
 }

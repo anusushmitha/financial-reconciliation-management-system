@@ -36,20 +36,32 @@ foreach ($dir in @($LogDir, $StorageStagingDir, $StorageDir)) {
     }
 }
 
-# Inject global environment variables across child processes
+# Inject global environment variables across child processes (loaded dynamically from .env.staging if present)
+$StagingEnvFile = Join-Path $ScriptDir ".env.staging"
+if (Test-Path $StagingEnvFile) {
+    Get-Content $StagingEnvFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line.Split("=", 2)
+            $key = $parts[0].Trim()
+            $val = $parts[1].Trim().Trim('"').Trim("'")
+            [Environment]::SetEnvironmentVariable($key, $val, "Process")
+        }
+    }
+}
+
 $env:ASPNETCORE_ENVIRONMENT = "Staging"
 $env:DOTNET_ENVIRONMENT = "Staging"
 $env:SEED_TEST_USERS = "false"
-$env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5433;Database=lendguard_staging;Username=postgres;Password=postgres"
+if (-not $env:ConnectionStrings__DefaultConnection) { $env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5433;Database=lendguard_staging;Username=postgres;Password=postgres" }
 $env:FILE_STORAGE_PATH = "$($ScriptDir.Replace('\', '/'))/storage_staging"
-$env:JWT_SECRET = "LendGuard_Staging_Super_Secret_High_Entropy_Key_2026_Secure_Must_Be_Long!"
+if (-not $env:JWT_SECRET) { $env:JWT_SECRET = if ($env:STAGING_JWT_SECRET) { $env:STAGING_JWT_SECRET } else { "LendGuard_Staging_Super_Secret_High_Entropy_Key_2026_Secure_Must_Be_Long!" } }
 $env:JWT_EXPIRY_MINUTES = "120"
 $env:AI_SERVICE_BASE_URL = "http://localhost:8000"
 $env:AI_SERVICE_KEY = $aiServiceKey
-$env:AI_PROVIDER = "nvidia"
-$env:AI_API_KEY = "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"
-$env:AI_MODEL = "minimaxai/minimax-m3.1-flash"
-$env:AI_BASE_URL = "https://integrate.api.nvidia.com/v1"
+if (-not $env:AI_PROVIDER) { $env:AI_PROVIDER = "nvidia" }
+if (-not $env:AI_MODEL) { $env:AI_MODEL = "minimaxai/minimax-m3.1-flash" }
+if (-not $env:AI_BASE_URL) { $env:AI_BASE_URL = "https://integrate.api.nvidia.com/v1" }
 
 function Write-Header {
     Write-Host "==========================================================================" -ForegroundColor Cyan

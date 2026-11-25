@@ -406,11 +406,70 @@ class ApiService {
     return this.request<PaginatedResponse<AuditLog>>(`/audit-logs?${searchParams}`);
   }
 
-  // System Demo Seed
+  // System Demo Seed & Enterprise Policy
   async resetDemoSeed(): Promise<{ success: boolean; message: string; resetCount: number }> {
     return this.request<{ success: boolean; message: string; resetCount: number }>('/system/demo-seed', {
       method: 'POST',
     });
+  }
+
+  async getPolicy(): Promise<{
+    selectedPreset: 'strict' | 'balanced' | 'fintech' | 'custom';
+    amountTolerancePercent: number;
+    fixedRupeeTolerance: number;
+    dateSlippageDays: number;
+    fuzzyReferenceMatching: boolean;
+    fuzzyThreshold: number;
+    autoReconConfidence: number;
+    isolationForestOutlierThreshold: number;
+    multiCurrencyHandling: boolean;
+    updatedAt?: string;
+  }> {
+    return this.request('/system/policy');
+  }
+
+  async updatePolicy(policy: {
+    profileId: string;
+    amountTolerancePercent: number;
+    fixedRupeeTolerance: number;
+    dateSlippageDays: number;
+    fuzzyReferenceMatching: boolean;
+    fuzzyThreshold: number;
+    autoReconConfidence: number;
+    isolationForestOutlierThreshold: number;
+    multiCurrencyHandling: boolean;
+  }): Promise<any> {
+    return this.request('/system/policy', {
+      method: 'PUT',
+      body: JSON.stringify(policy),
+    });
+  }
+
+  async postExceptionJournal(
+    id: string,
+    payload: {
+      currency: string;
+      strategy: string;
+      memo: string;
+      lines: Array<{ accountCode: string; accountName: string; debit: number; credit: number }>;
+    }
+  ): Promise<{ journalEntryRef: string; exceptionId: string; totalDebit: number; totalCredit: number; status: string; postedAt: string }> {
+    return this.request(`/exceptions/${id}/journal`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  async getReadiness(): Promise<{ status: string; database: string; aiService: string; aiLatencyMs?: number | null; apiLatencyMs: number }> {
+    const res = await fetch(`${API_BASE_URL}/health/ready`);
+    return res.json();
   }
 }
 

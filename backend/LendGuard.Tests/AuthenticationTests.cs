@@ -176,4 +176,38 @@ public class AuthenticationTests
 
         Assert.Contains("final active administrator", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task SEC03_ChangePassword_ValidatesCurrentAndUpdatesHash()
+    {
+        // Arrange
+        var (context, authService) = CreateTestSetup();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            FullName = "Password Changer",
+            Email = "changer@lendguard.internal",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("OldPassword123!"),
+            Role = UserRole.Analyst,
+            IsActive = true
+        };
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        // Wrong current password rejected
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            authService.ChangePasswordAsync(user.Id, new ChangePasswordRequest { CurrentPassword = "Wrong", NewPassword = "NewPassword456!" }));
+
+        // Act: valid change
+        var res = await authService.ChangePasswordAsync(user.Id, new ChangePasswordRequest
+        {
+            CurrentPassword = "OldPassword123!",
+            NewPassword = "NewPassword456!"
+        });
+
+        // Assert
+        Assert.Contains("successfully", res.Message, StringComparison.OrdinalIgnoreCase);
+        var updated = await context.Users.FindAsync(user.Id);
+        Assert.True(BCrypt.Net.BCrypt.Verify("NewPassword456!", updated!.PasswordHash));
+    }
 }

@@ -15,10 +15,8 @@ import { useToast } from '../../context/ToastContext';
 import {
   ArrowLeft,
   Bot,
-  User,
   CheckCircle2,
   AlertTriangle,
-  Clock,
   Sparkles,
   Send,
   UserPlus,
@@ -27,10 +25,10 @@ import {
   FileCheck2,
   Activity,
   Cpu,
-  Gauge,
   BookOpen,
   Copy,
   Check,
+  Download,
 } from 'lucide-react';
 import { SpotlightCard } from '../../components/reactbits/SpotlightCard';
 import { AnimatedCounter } from '../../components/reactbits/AnimatedCounter';
@@ -55,6 +53,8 @@ export const ExceptionDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [analyzingAi, setAnalyzingAi] = useState(false);
   const [copiedJournal, setCopiedJournal] = useState(false);
+  const [postingJournal, setPostingJournal] = useState(false);
+  const [postedJournalRef, setPostedJournalRef] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Note form state
@@ -106,7 +106,7 @@ export const ExceptionDetailPage: React.FC = () => {
       setNotes((prev) => [...prev, created]);
       setNewNote('');
     } catch (err: any) {
-      alert(err?.message || 'Failed to post note.');
+      addToast(err?.message || 'Failed to post note.', 'error');
     } finally {
       setSubmittingNote(false);
     }
@@ -120,7 +120,7 @@ export const ExceptionDetailPage: React.FC = () => {
       if (results.explanation) setExplanationAnalysis(results.explanation);
       if (results.anomaly) setAnomalyAnalysis(results.anomaly);
     } catch (err: any) {
-      alert(err?.message || 'AI service unavailable. Advisory analysis could not be completed.');
+      addToast(err?.message || 'AI service unavailable. Advisory analysis could not be completed.', 'error');
     } finally {
       setAnalyzingAi(false);
     }
@@ -150,7 +150,7 @@ export const ExceptionDetailPage: React.FC = () => {
       await api.assignException(id, user.id);
       await loadData();
     } catch (err: any) {
-      alert(err?.message || 'Failed to claim exception.');
+      addToast(err?.message || 'Failed to claim exception.', 'error');
     } finally {
       setAssigning(false);
     }
@@ -164,7 +164,7 @@ export const ExceptionDetailPage: React.FC = () => {
       setShowAssignModal(false);
       await loadData();
     } catch (err: any) {
-      alert(err?.message || 'Failed to assign exception.');
+      addToast(err?.message || 'Failed to assign exception.', 'error');
     } finally {
       setAssigning(false);
     }
@@ -182,7 +182,7 @@ export const ExceptionDetailPage: React.FC = () => {
       setShowResolveModal(false);
       await loadData();
     } catch (err: any) {
-      alert(err?.message || 'Failed to resolve exception.');
+      addToast(err?.message || 'Failed to resolve exception.', 'error');
     } finally {
       setResolving(false);
     }
@@ -855,6 +855,44 @@ export const ExceptionDetailPage: React.FC = () => {
           setTimeout(() => setCopiedJournal(false), 2500);
         };
 
+        const exportJournalCsv = () => {
+          const header = 'AccountCode,AccountName,Currency,Debit,Credit,Memo\n';
+          const body = lines
+            .map((l) => `${l.code},"${l.name}",${currency},${l.debit.toFixed(2)},${l.credit.toFixed(2)},"${memo.replace(/"/g, '""')}"`)
+            .join('\n');
+          const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `gl_journal_${exception.id.slice(0, 8)}.csv`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+          addToast('ERP Journal Voucher CSV exported.', 'success');
+        };
+
+        const postJournalToLedger = async () => {
+          try {
+            setPostingJournal(true);
+            const res = await api.postExceptionJournal(exception.id, {
+              currency,
+              strategy: strategyTitle,
+              memo,
+              lines: lines.map((l) => ({
+                accountCode: l.code,
+                accountName: l.name,
+                debit: Number(l.debit.toFixed(2)),
+                credit: Number(l.credit.toFixed(2)),
+              })),
+            });
+            setPostedJournalRef(res.journalEntryRef);
+            addToast(`Journal ${res.journalEntryRef} posted cleanly to audit log.`, 'success');
+          } catch (err: any) {
+            addToast(err?.message || 'Failed to record GL journal entry.', 'error');
+          } finally {
+            setPostingJournal(false);
+          }
+        };
+
         return (
           <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
@@ -863,13 +901,18 @@ export const ExceptionDetailPage: React.FC = () => {
                   <BookOpen size={20} />
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
                       Prescriptive Double-Entry Accounting Journal Suggestion
                     </h3>
                     <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', backgroundColor: '#DCFCE7', color: '#15803D' }}>
                       GAAP / IFRS COMPLIANT
                     </span>
+                    {postedJournalRef && (
+                      <span style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'monospace', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
+                        POSTED: {postedJournalRef}
+                      </span>
+                    )}
                   </div>
                   <span style={{ fontSize: '12px', color: '#64748B' }}>
                     Strategy: <strong style={{ color: '#334155' }}>{strategyTitle}</strong>
@@ -877,15 +920,36 @@ export const ExceptionDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={copyJournalPayload}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}
-              >
-                {copiedJournal ? <Check size={14} style={{ color: '#16A34A' }} /> : <Copy size={14} />}
-                <span>{copiedJournal ? 'Payload Copied!' : 'Copy Journal Payload (JSON)'}</span>
-              </button>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={copyJournalPayload}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+                >
+                  {copiedJournal ? <Check size={14} style={{ color: '#16A34A' }} /> : <Copy size={14} />}
+                  <span>{copiedJournal ? 'Payload Copied!' : 'Copy JSON'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={exportJournalCsv}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+                >
+                  <Download size={14} />
+                  <span>Export ERP CSV</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={postJournalToLedger}
+                  disabled={postingJournal || !isBalanced}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}
+                >
+                  <CheckCircle2 size={14} />
+                  <span>{postingJournal ? 'Posting...' : postedJournalRef ? 'Recorded to Audit Log' : 'Post to Immutable GL Log'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Memo Box */}

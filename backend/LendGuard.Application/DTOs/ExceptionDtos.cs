@@ -100,3 +100,29 @@ public class ResolveExceptionRequest
     public string ResolutionCategory { get; set; } = string.Empty;
     public string Explanation { get; set; } = string.Empty;
 }
+
+public class JournalLineDto
+{
+    public string AccountCode { get; set; } = string.Empty;
+    public string AccountName { get; set; } = string.Empty;
+    public decimal Debit { get; set; }
+    public decimal Credit { get; set; }
+}
+
+public class PostJournalRequest
+{
+    public string Currency { get; set; } = "INR";
+    public string Strategy { get; set; } = string.Empty;
+    public string Memo { get; set; } = string.Empty;
+    public List<JournalLineDto> Lines { get; set; } = new();
+}
+
+public class PostJournalResponse
+{
+    public string JournalEntryRef { get; set; } = string.Empty;
+    public Guid ExceptionId { get; set; }
+    public decimal TotalDebit { get; set; }
+    public decimal TotalCredit { get; set; }
+    public string Status { get; set; } = "POSTED";
+    public DateTimeOffset PostedAt { get; set; }
+}

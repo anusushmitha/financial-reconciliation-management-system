@@ -1,16 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { api } from '../../services/api';
 import { StatusBadge } from '../../components/Badge';
-import { User, Mail, Shield, LogOut, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Mail, Shield, LogOut, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const ProfilePage: React.FC = () => {
   const { user, logout, isAdmin } = useAuth();
+  const { addToast } = useToast();
   const navigate = useNavigate();
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPass, setChangingPass] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      addToast('New password must be at least 8 characters.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      addToast('New password and confirmation do not match.', 'error');
+      return;
+    }
+    try {
+      setChangingPass(true);
+      await api.changePassword(currentPassword, newPassword);
+      addToast('Password changed and audited successfully.', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to change password.', 'error');
+    } finally {
+      setChangingPass(false);
+    }
   };
 
   if (!user) return null;
@@ -106,15 +138,67 @@ export const ProfilePage: React.FC = () => {
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', backgroundColor: '#F5F3FF', borderRadius: '6px' }}>
                 <CheckCircle2 size={16} color="#7C3AED" />
-                <span>Employee Account Provisioning, Deactivation, and Role Management</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', backgroundColor: '#F5F3FF', borderRadius: '6px' }}>
-                <CheckCircle2 size={16} color="#7C3AED" />
                 <span>Immutable Regulatory Compliance Audit Trail Access</span>
               </div>
             </>
           )}
         </div>
+      </div>
+
+      {/* Security & Self-Service Password Update */}
+      <div className="card" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <KeyRound size={18} color="var(--primary)" />
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+            Security & Password Management
+          </h3>
+        </div>
+
+        <form onSubmit={handleChangePassword} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px', alignItems: 'end' }}>
+          <div>
+            <label className="form-label" style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>Current Password</label>
+            <input
+              type="password"
+              className="form-control"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <label className="form-label" style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>New Password (8+ chars)</label>
+            <input
+              type="password"
+              className="form-control"
+              required
+              minLength={8}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Minimum 8 characters"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <label className="form-label" style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>Confirm New Password</label>
+            <input
+              type="password"
+              className="form-control"
+              required
+              minLength={8}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm new password"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <button type="submit" className="btn btn-primary" disabled={changingPass} style={{ width: '100%' }}>
+              {changingPass ? 'Updating...' : 'Update Password'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

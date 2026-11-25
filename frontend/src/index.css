@@ -291,3 +291,30 @@ tr:hover td {
   padding: 4px 10px !important;
   font-size: 12px !important;
 }
+
+/* Executive Dossier Clean Print Isolation */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #printable-dossier,
+  #printable-dossier * {
+    visibility: visible !important;
+  }
+  #printable-dossier {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #FFFFFF !important;
+  }
+  .modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+}

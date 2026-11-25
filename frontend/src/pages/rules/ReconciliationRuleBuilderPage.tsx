@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Sliders, Shield, Save, RotateCcw, CheckCircle2, AlertTriangle, Layers, Percent, Calendar, Sparkles } from 'lucide-react';
+import { Sliders, Shield, Save, RotateCcw, Layers, Percent, Calendar, Sparkles } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { SpotlightCard } from '../../components/reactbits/SpotlightCard';
-import { ShinyText } from '../../components/reactbits/ShinyText';
-import { BorderBeam } from '../../components/reactbits/BorderBeam';
 
 interface MatchingPolicy {
   amountTolerancePercent: number;
@@ -31,12 +31,36 @@ const DEFAULT_POLICY: MatchingPolicy = {
 
 export const ReconciliationRuleBuilderPage: React.FC = () => {
   const { showToast } = useToast();
+  const { isAdmin } = useAuth();
   const [policy, setPolicy] = useState<MatchingPolicy>(() => {
     const saved = localStorage.getItem('lendguard_matching_policy');
     return saved ? JSON.parse(saved) : DEFAULT_POLICY;
   });
 
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    api.getPolicy().then((remote) => {
+      if (!mounted) return;
+      const merged: MatchingPolicy = {
+        amountTolerancePercent: Number(remote.amountTolerancePercent ?? 0),
+        fixedRupeeTolerance: Number(remote.fixedRupeeTolerance ?? 0),
+        dateSlippageDays: Number(remote.dateSlippageDays ?? 0),
+        fuzzyReferenceMatching: Boolean(remote.fuzzyReferenceMatching),
+        fuzzyThreshold: Number(remote.fuzzyThreshold ?? 85),
+        autoReconConfidence: Number(remote.autoReconConfidence ?? 95),
+        isolationForestOutlierThreshold: Number(remote.isolationForestOutlierThreshold ?? 0.75),
+        multiCurrencyHandling: Boolean(remote.multiCurrencyHandling),
+        selectedPreset: remote.selectedPreset || 'strict',
+      };
+      setPolicy(merged);
+      localStorage.setItem('lendguard_matching_policy', JSON.stringify(merged));
+    }).catch(() => {
+      // Keep local cache silently if offline
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const applyPreset = (preset: 'strict' | 'balanced' | 'fintech') => {
     if (preset === 'strict') {
@@ -74,19 +98,61 @@ export const ReconciliationRuleBuilderPage: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
-    setSaving(true);
-    localStorage.setItem('lendguard_matching_policy', JSON.stringify(policy));
-    setTimeout(() => {
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      localStorage.setItem('lendguard_matching_policy', JSON.stringify(policy));
+      if (isAdmin) {
+        await api.updatePolicy({
+          profileId: policy.selectedPreset,
+          amountTolerancePercent: policy.amountTolerancePercent,
+          fixedRupeeTolerance: policy.fixedRupeeTolerance,
+          dateSlippageDays: policy.dateSlippageDays,
+          fuzzyReferenceMatching: policy.fuzzyReferenceMatching,
+          fuzzyThreshold: policy.fuzzyThreshold,
+          autoReconConfidence: policy.autoReconConfidence,
+          isolationForestOutlierThreshold: policy.isolationForestOutlierThreshold,
+          multiCurrencyHandling: policy.multiCurrencyHandling,
+        });
+        showToast('Policy Persisted to Database', 'PostgreSQL & Reconciliation engine synchronized cleanly.', 'success');
+      } else {
+        showToast('Policy Preview Updated', 'Read-only preview saved locally (Admin role persists institution rules).', 'info');
+      }
+    } catch (err: any) {
+      showToast('Policy Sync Error', err?.message || 'Failed to save rule policy to database.', 'error');
+    } finally {
       setSaving(false);
-      showToast('Policy Rules Synchronized', 'Reconciliation engine calibrated with new matching tolerance parameters.', 'success');
-    }, 400);
+    }
   };
 
-  const handleReset = () => {
-    setPolicy(DEFAULT_POLICY);
-    localStorage.removeItem('lendguard_matching_policy');
-    showToast('Reset to Defaults', 'Matching rules restored to standard platform baseline.', 'info');
+  const handleReset = async () => {
+    const strictBaseline: MatchingPolicy = {
+      ...DEFAULT_POLICY,
+      amountTolerancePercent: 0.0,
+      fixedRupeeTolerance: 0.0,
+      dateSlippageDays: 0,
+      selectedPreset: 'strict',
+    };
+    setPolicy(strictBaseline);
+    localStorage.setItem('lendguard_matching_policy', JSON.stringify(strictBaseline));
+    if (isAdmin) {
+      try {
+        await api.updatePolicy({
+          profileId: 'strict',
+          amountTolerancePercent: 0,
+          fixedRupeeTolerance: 0,
+          dateSlippageDays: 0,
+          fuzzyReferenceMatching: true,
+          fuzzyThreshold: 85,
+          autoReconConfidence: 95,
+          isolationForestOutlierThreshold: 0.75,
+          multiCurrencyHandling: true,
+        });
+      } catch {
+        // Ignore if network busy
+      }
+    }
+    showToast('Reset to Strict Baseline', 'Matching rules restored to zero-tolerance audit baseline.', 'info');
   };
 
   return (

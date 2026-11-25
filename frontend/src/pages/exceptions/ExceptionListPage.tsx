@@ -6,6 +6,7 @@ import { StatusBadge, SeverityBadge } from '../../components/Badge';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { EmptyState } from '../../components/EmptyState';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import {
   AlertTriangle,
   Filter,
@@ -24,6 +25,7 @@ import {
 type WorkloadTab = 'ALL' | 'MINE' | 'UNASSIGNED' | 'RESOLVED';
 
 export const ExceptionListPage: React.FC = () => {
+  const { addToast } = useToast();
   const [exceptions, setExceptions] = useState<ExceptionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,7 +198,7 @@ export const ExceptionListPage: React.FC = () => {
       await loadCounts();
       setTimeout(() => setFeedbackMessage(null), 3500);
     } catch (err: any) {
-      alert(err?.message || 'Failed to update assignment.');
+      addToast(err?.message || 'Failed to update assignment.', 'error');
     } finally {
       setInlineAssigningId(null);
     }

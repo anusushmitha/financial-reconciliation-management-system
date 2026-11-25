@@ -13,13 +13,25 @@ test.describe('LENDGUARD AI — Enterprise Max-Roof Capabilities E2E Verificatio
     await page.waitForURL('**/dashboard', { timeout: 10000 });
   });
 
-  test('01. Showcase Architecture Tour Modal & Topbar Controls', async ({ page }) => {
+  test('01. Brand Title, Live Telemetry Pill, Notification Inbox, Tour & Demo Reset Modal', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
 
-    await expect(page.getByText('AI CLUSTER ONLINE')).toBeVisible();
-    await page.getByRole('button', { name: /Showcase Tour/i }).click();
+    await expect(page).toHaveTitle(/LendGuard AI/i);
+    await expect(page.getByText(/AI CLUSTER ONLINE • \d+ms/i)).toBeVisible({ timeout: 8000 });
 
+    // Open Notification Bell drawer
+    await page.locator('button[title="Live Notifications & Event Feed"]').click();
+    await expect(page.getByText(/Notification Feed/i)).toBeVisible();
+    await page.locator('button[title="Live Notifications & Event Feed"]').click();
+
+    // Open Re-Seed Confirm Modal (non-blocking Astryx modal) & cancel cleanly
+    await page.getByRole('button', { name: /Re-Seed Demo/i }).click();
+    await expect(page.getByText('Confirm Showcase Demo Reset')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    // Showcase Tour Modal
+    await page.getByRole('button', { name: /Showcase Tour/i }).click();
     await expect(page.getByText('LendGuard Enterprise Architecture & Feature Walkthrough')).toBeVisible();
     await expect(page.getByText(/High-Throughput Ingestion/i)).toBeVisible();
     await expect(page.getByText(/Dual-Engine AI Intelligence/i)).toBeVisible();
@@ -30,30 +42,31 @@ test.describe('LENDGUARD AI — Enterprise Max-Roof Capabilities E2E Verificatio
     expect(errors).toEqual([]);
   });
 
-  test('02. Policy & Reconciliation Rule Builder (/rules) Presets & Persistence', async ({ page }) => {
+  test('02. Policy & Reconciliation Rule Builder (/rules) Database Persistence & Reload', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
 
     await page.goto(`${BASE_URL}/rules`);
     await expect(page.getByText('Reconciliation Policy & Rule Engine')).toBeVisible();
 
-    // Select Strict Banking preset
-    await page.getByText('Strict Banking Policy').click();
-    // Save policy and check confirmation
-    await page.getByRole('button', { name: /Save & Calibrate Engine/i }).click();
-
-    const saved = await page.evaluate(() => localStorage.getItem('lendguard_matching_policy'));
-    expect(saved).not.toBeNull();
-    const parsed = JSON.parse(saved!);
-    expect(parsed.selectedPreset).toBe('strict');
-    expect(parsed.fixedRupeeTolerance).toBe(0);
-
-    // Switch to High-Velocity Fintech preset
+    // Switch to High-Velocity Fintech preset & persist to PostgreSQL via API
     await page.getByText('High-Velocity Fintech').click();
+    const putPromise = page.waitForResponse((res) => res.url().includes('/api/v1/system/policy') && res.request().method() === 'PUT');
     await page.getByRole('button', { name: /Save & Calibrate Engine/i }).click();
+    const putRes = await putPromise;
+    expect(putRes.status()).toBe(200);
 
-    const updated = await page.evaluate(() => localStorage.getItem('lendguard_matching_policy'));
-    expect(JSON.parse(updated!).selectedPreset).toBe('fintech');
+    // Full page reload must hydrate fintech preset directly from PostgreSQL backend
+    await page.reload();
+    await expect(page.getByText('High-Velocity Fintech')).toBeVisible();
+    const saved = await page.evaluate(() => localStorage.getItem('lendguard_matching_policy'));
+    expect(JSON.parse(saved!).selectedPreset).toBe('fintech');
+
+    // Restore Strict Banking baseline policy cleanly
+    await page.getByRole('button', { name: /Restore Defaults/i }).click();
+    await page.waitForTimeout(400);
+    const restored = await page.evaluate(() => localStorage.getItem('lendguard_matching_policy'));
+    expect(JSON.parse(restored!).selectedPreset).toBe('strict');
     expect(errors).toEqual([]);
   });
 
@@ -76,7 +89,6 @@ test.describe('LENDGUARD AI — Enterprise Max-Roof Capabilities E2E Verificatio
       buffer: Buffer.from(sampleCsv),
     });
 
-    // Verify Pre-Flight Schema Inspector renders ONCE cleanly under dropzone
     const verifiedBadge = page.getByText('Pre-Flight Schema Verified • Ready for Ingestion');
     await expect(verifiedBadge).toHaveCount(1);
     await expect(verifiedBadge).toBeVisible();
@@ -84,14 +96,13 @@ test.describe('LENDGUARD AI — Enterprise Max-Roof Capabilities E2E Verificatio
     expect(errors).toEqual([]);
   });
 
-  test('04. Exception Detail Dual-Engine AI & Prescriptive Double-Entry Journal', async ({ page }) => {
+  test('04. Exception Detail Dual-Engine AI, GL Posting & Prescriptive Double-Entry Journal', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
 
     await page.goto(`${BASE_URL}/exceptions`);
     await page.waitForTimeout(800);
 
-    // Open first exception detail row
     const firstRow = page.locator('table tbody tr').first();
     await expect(firstRow).toBeVisible({ timeout: 10000 });
     await firstRow.click();
@@ -101,6 +112,15 @@ test.describe('LENDGUARD AI — Enterprise Max-Roof Capabilities E2E Verificatio
     await expect(page.getByText('Prescriptive Double-Entry Accounting Journal Suggestion')).toBeVisible();
     await expect(page.getByText('GAAP / IFRS COMPLIANT')).toBeVisible();
     await expect(page.getByText(/Dual-Entry Trial Balance Verified \(Variance: 0\.00\)/i)).toBeVisible();
+
+    // Post balanced GL journal entry to immutable PostgreSQL audit ledger
+    const postBtn = page.getByRole('button', { name: /Post to Immutable GL Log/i });
+    await expect(postBtn).toBeVisible();
+    const journalPromise = page.waitForResponse((res) => res.url().includes('/journal') && res.request().method() === 'POST');
+    await postBtn.click();
+    const journalRes = await journalPromise;
+    expect(journalRes.status()).toBe(200);
+    await expect(page.getByText(/POSTED: JE-LG-/i)).toBeVisible({ timeout: 5000 });
 
     // Trigger AI Diagnostics if available
     const runAiBtn = page.getByRole('button', { name: /Full AI Diagnostics/i }).first();

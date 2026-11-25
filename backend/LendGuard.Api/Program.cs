@@ -1,4 +1,7 @@
+using System;
+using System.Linq;
 using System.Text;
+using System.Threading.RateLimiting;
 using LendGuard.Api.Hubs;
 using LendGuard.Api.Middlewares;
 using LendGuard.Api.Services;
@@ -8,6 +11,9 @@ using LendGuard.Infrastructure;
 using LendGuard.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -66,7 +72,21 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddHttpClient();
 builder.Services.AddControllers();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 
 var app = builder.Build();
 
@@ -83,11 +103,45 @@ if (app.Configuration.GetValue<bool>("REQUIRE_HTTPS") || app.Environment.IsProdu
 {
     app.UseHttpsRedirection();
 }
+
+// Enterprise Security Headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    await next();
+});
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseCors("AllowAll");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<LendGuardHub>("/hubs/lendguard");
+
+// Lightweight OpenAPI / Endpoint Discovery Catalog (Zero external NuGet dependency)
+app.MapGet("/api/v1/openapi.json", (EndpointDataSource endpointSource) =>
+{
+    var routes = endpointSource.Endpoints
+        .OfType<RouteEndpoint>()
+        .Select(e => new
+        {
+            route = e.RoutePattern.RawText,
+            methods = e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? new[] { "ANY" }
+        })
+        .OrderBy(r => r.route)
+        .ToList();
+
+    return Results.Ok(new
+    {
+        openapi = "3.0.1",
+        info = new { title = "LendGuard Enterprise Reconciliation API", version = "v2.0" },
+        endpointCount = routes.Count,
+        endpoints = routes
+    });
+}).AllowAnonymous();
 
 app.Run();

@@ -95,4 +95,11 @@ public class ExceptionsController : ApiControllerBase
         var result = await _exceptionService.ResolveExceptionAsync(id, request, CurrentUserId, CurrentUserRole, cancellationToken);
         return Ok(result);
     }
+
+    [HttpPost("{id}/journal")]
+    public async Task<ActionResult<PostJournalResponse>> PostPrescriptiveJournal(Guid id, [FromBody] PostJournalRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _exceptionService.PostPrescriptiveJournalAsync(id, request, CurrentUserId, CurrentUserRole, cancellationToken);
+        return Ok(result);
+    }
 }

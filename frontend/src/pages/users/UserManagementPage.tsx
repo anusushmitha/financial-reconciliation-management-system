@@ -6,6 +6,7 @@ import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import { EmptyState } from '../../components/EmptyState';
 import { Modal } from '../../components/Modal';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import {
   Users,
   UserPlus,
@@ -19,6 +20,7 @@ import {
 
 export const UserManagementPage: React.FC = () => {
   const { user: currentUser, isAdmin } = useAuth();
+  const { addToast } = useToast();
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,20 +110,21 @@ export const UserManagementPage: React.FC = () => {
 
   const handleToggleActive = async (u: UserSummary) => {
     if (currentUser && u.id === currentUser.id) {
-      alert('You cannot deactivate your own administrative account.');
+      addToast('You cannot deactivate your own administrative account.', 'error');
       return;
     }
 
     try {
       if (u.isActive) {
-        if (!confirm(`Are you sure you want to deactivate ${u.fullName}?`)) return;
         await api.deactivateUser(u.id);
+        addToast(`User ${u.fullName} deactivated.`, 'warning');
       } else {
         await api.activateUser(u.id);
+        addToast(`User ${u.fullName} activated.`, 'success');
       }
       await loadUsers();
     } catch (err: any) {
-      alert(err?.message || 'Failed to change user status.');
+      addToast(err?.message || 'Failed to change user status.', 'error');
     }
   };
 

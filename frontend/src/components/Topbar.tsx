@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
@@ -6,19 +6,14 @@ import { StatusBadge } from './Badge';
 import { Modal } from './Modal';
 import {
   Bell,
-  ShieldCheck,
-  Activity,
   Search,
   Sliders,
   RotateCcw,
   Compass,
   Sparkles,
-  CheckCircle2,
   ExternalLink,
-  Layers,
-  Cpu,
-  Database,
-  BookOpen,
+  CheckCheck,
+  Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ShinyText } from './reactbits/ShinyText';
@@ -39,16 +34,49 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleDensity,
 }) => {
   const { user, login } = useAuth();
-  const { addToast } = useToast();
+  const { addToast, history, unreadCount, markAllRead, clearHistory } = useToast();
   const navigate = useNavigate();
   const [showTour, setShowTour] = useState(false);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [clusterStatus, setClusterStatus] = useState<{ status: string; latencyMs: number | null }>({
+    status: 'Healthy',
+    latencyMs: null,
+  });
 
-  const handleResetDemo = async () => {
-    if (!window.confirm('Reset database to curated showcase demo state? (5 flagship exceptions with assignments)')) return;
+  useEffect(() => {
+    let active = true;
+    const probe = async () => {
+      const start = performance.now();
+      try {
+        const res = await api.getReadiness();
+        const totalMs = Math.round(performance.now() - start);
+        if (active) {
+          setClusterStatus({
+            status: res.status || 'Healthy',
+            latencyMs: typeof res.aiLatencyMs === 'number' ? res.aiLatencyMs : totalMs,
+          });
+        }
+      } catch {
+        if (active) {
+          setClusterStatus({ status: 'Offline', latencyMs: null });
+        }
+      }
+    };
+    probe();
+    const timer = setInterval(probe, 15000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  const executeResetDemo = async () => {
     try {
       setResetting(true);
       const res = await api.resetDemoSeed();
+      setShowConfirmReset(false);
       addToast(res?.message || 'Demo data re-seeded successfully', 'success');
       setTimeout(() => window.location.reload(), 800);
     } catch (err: any) {
@@ -148,31 +176,166 @@ export const Topbar: React.FC<TopbarProps> = ({
           </button>
         )}
 
-        {/* Astryx Staging Cluster Status indicator */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: '#F0FDF4',
-            padding: '5px 12px',
-            borderRadius: '20px',
-            border: '1px solid #BBF7D0',
-          }}
-        >
-          <span
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#16A34A',
-              display: 'inline-block',
-              boxShadow: '0 0 8px rgba(22, 163, 74, 0.8)',
+        {/* Live Telemetry Cluster Readiness Indicator */}
+        {(() => {
+          const isOnline = clusterStatus.status === 'Healthy';
+          const isDegraded = clusterStatus.status === 'Degraded';
+          const bg = isOnline ? '#F0FDF4' : isDegraded ? '#FEF3C7' : '#FEF2F2';
+          const border = isOnline ? '#BBF7D0' : isDegraded ? '#FDE68A' : '#FECACA';
+          const dot = isOnline ? '#16A34A' : isDegraded ? '#D97706' : '#DC2626';
+          const fg = isOnline ? '#166534' : isDegraded ? '#92400E' : '#991B1B';
+          const label = isOnline
+            ? `AI CLUSTER ONLINE • ${clusterStatus.latencyMs ?? 12}ms`
+            : isDegraded
+              ? 'AI SERVICE DEGRADED'
+              : 'CLUSTER OFFLINE';
+
+          return (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: bg,
+                padding: '5px 12px',
+                borderRadius: '20px',
+                border: `1px solid ${border}`,
+              }}
+              title="Live Postgres + FastAPI AI Microservice Health Ping"
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: dot,
+                  display: 'inline-block',
+                  boxShadow: `0 0 8px ${dot}`,
+                }}
+              />
+              <span style={{ fontSize: '12px', fontWeight: 700, color: fg, letterSpacing: '0.02em' }}>
+                <ShinyText text={label} speed={3} />
+              </span>
+            </div>
+          );
+        })()}
+
+        {/* Persistent SignalR & Event Notification Bell */}
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !showNotifications;
+              setShowNotifications(next);
+              if (next) markAllRead();
             }}
-          />
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#166534', letterSpacing: '0.02em' }}>
-            <ShinyText text="AI CLUSTER ONLINE • 14ms" speed={3} />
-          </span>
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '34px',
+              height: '34px',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0',
+              backgroundColor: showNotifications ? '#EFF6FF' : '#FFFFFF',
+              color: showNotifications ? 'var(--primary)' : '#475569',
+              cursor: 'pointer',
+            }}
+            title="Live Notifications & Event Feed"
+          >
+            <Bell size={16} />
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  minWidth: '16px',
+                  height: '16px',
+                  borderRadius: '999px',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 4px',
+                }}
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {showNotifications && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '42px',
+                right: 0,
+                width: '340px',
+                maxHeight: '420px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.12)',
+                zIndex: 120,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                  Notification Feed ({history.length})
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={markAllRead}
+                    style={{ border: 'none', background: 'none', fontSize: '11px', color: 'var(--primary)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    <CheckCheck size={12} /> Read
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearHistory}
+                    style={{ border: 'none', background: 'none', fontSize: '11px', color: '#64748B', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    <Trash2 size={12} /> Clear
+                  </button>
+                </div>
+              </div>
+              <div style={{ overflowY: 'auto', maxHeight: '350px' }}>
+                {history.length === 0 ? (
+                  <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: '12px', color: '#94A3B8' }}>
+                    No recent notifications. Live SignalR events and workflow alerts appear here.
+                  </div>
+                ) : (
+                  history.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '10px 14px',
+                        borderBottom: '1px solid #F1F5F9',
+                        backgroundColor: item.read ? '#FFFFFF' : '#F8FAFC',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B' }}>{item.title}</span>
+                        <span style={{ fontSize: '10px', color: '#94A3B8' }}>
+                          {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748B', lineHeight: 1.4 }}>{item.message}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Showcase Tour & Architecture Guide */}
@@ -202,7 +365,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         {/* Quick Demo Re-Seed */}
         <button
           type="button"
-          onClick={handleResetDemo}
+          onClick={() => setShowConfirmReset(true)}
           disabled={resetting}
           style={{
             display: 'flex',
@@ -443,6 +606,36 @@ export const Topbar: React.FC<TopbarProps> = ({
               onClick={() => setShowTour(false)}
             >
               Start Exploring LendGuard
+            </button>
+          </div>
+        </div>
+      </Modal>
+    )}
+
+    {/* Non-Blocking Astryx Demo Re-Seed Confirmation Modal */}
+    {showConfirmReset && (
+      <Modal
+        isOpen={showConfirmReset}
+        onClose={() => setShowConfirmReset(false)}
+        title="Confirm Showcase Demo Reset"
+        maxWidth="460px"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ fontSize: '13px', color: '#475569', margin: 0, lineHeight: 1.5 }}>
+            Restore the database to the curated demonstration baseline (5 flagship exceptions distributed across Anu Sushmitha, Operational Analyst, and unassigned outlier queue)?
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowConfirmReset(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={resetting}
+              onClick={executeResetDemo}
+              style={{ backgroundColor: '#D97706', borderColor: '#D97706', color: '#FFFFFF' }}
+            >
+              {resetting ? 'Re-Seeding...' : 'Confirm Reset'}
             </button>
           </div>
         </div>

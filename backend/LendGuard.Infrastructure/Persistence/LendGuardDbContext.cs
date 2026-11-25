@@ -25,6 +25,7 @@ public class LendGuardDbContext : DbContext, IApplicationDbContext
     public DbSet<AiAnalysis> AiAnalyses => Set<AiAnalysis>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<BackgroundJob> BackgroundJobs => Set<BackgroundJob>();
+    public DbSet<ReconciliationPolicy> ReconciliationPolicies => Set<ReconciliationPolicy>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -325,6 +326,18 @@ public class LendGuardDbContext : DbContext, IApplicationDbContext
 
             entity.HasIndex(e => new { e.Status, e.AvailableAt });
             entity.HasIndex(e => new { e.JobType, e.Status });
+        });
+
+        // reconciliation_policies
+        modelBuilder.Entity<ReconciliationPolicy>(entity =>
+        {
+            entity.ToTable("reconciliation_policies");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ProfileId).HasMaxLength(30).HasDefaultValue("strict").IsRequired();
+            entity.Property(e => e.AmountTolerancePercent).HasColumnType("numeric(8,4)").IsRequired();
+            entity.Property(e => e.FixedRupeeTolerance).HasColumnType("numeric(18,2)").IsRequired();
+            entity.Property(e => e.IsolationForestOutlierThreshold).HasColumnType("numeric(5,2)").IsRequired();
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("now()");
         });
     }
 }

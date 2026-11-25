@@ -29,9 +29,10 @@ services:
     environment:
       PORT: 8000
       AI_SERVICE_KEY: lendguard_internal_ai_secret_key_2026
-      LLM_PROVIDER: mock
-      LLM_API_KEY: test_key
-      LLM_MODEL: gpt-4o-mini
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      AI_API_KEY: ${AI_API_KEY:-test_key}
+      AI_MODEL: ${AI_MODEL:-nvidia/nemotron-3.5-bolt-e4b}
+      AI_BASE_URL: ${AI_BASE_URL:-https://integrate.api.nvidia.com/v1}
     ports:
       - "8000:8000"
     healthcheck:

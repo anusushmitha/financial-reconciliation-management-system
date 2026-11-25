@@ -3,18 +3,10 @@ import { api } from '../../services/api';
 import { ReconciliationReport, ExceptionReport } from '../../types';
 import { LoadingSkeleton } from '../../components/LoadingSkeleton';
 import {
-  BarChart3,
   Download,
-  Calendar,
-  Layers,
-  AlertTriangle,
-  CheckCircle2,
-  Filter,
   FileText,
   Printer,
-  X,
   ShieldCheck,
-  Building,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -30,8 +22,10 @@ import { AnimatedCounter } from '../../components/reactbits/AnimatedCounter';
 import { CircularGauge } from '../../components/reactbits/CircularGauge';
 import { ShinyText } from '../../components/reactbits/ShinyText';
 import { Modal } from '../../components/Modal';
+import { useToast } from '../../context/ToastContext';
 
 export const ReportsPage: React.FC = () => {
+  const { addToast } = useToast();
   const [reconReport, setReconReport] = useState<ReconciliationReport | null>(null);
   const [exReport, setExReport] = useState<ExceptionReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,7 +73,7 @@ export const ReportsPage: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err?.message || 'Failed to export reconciliation report.');
+      addToast(err?.message || 'Failed to export reconciliation report.', 'error');
     } finally {
       setExportingRecon(false);
     }
@@ -99,7 +93,7 @@ export const ReportsPage: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err?.message || 'Failed to export exceptions report.');
+      addToast(err?.message || 'Failed to export exceptions report.', 'error');
     } finally {
       setExportingEx(false);
     }

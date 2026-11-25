@@ -425,4 +425,64 @@ public class ExceptionWorkflowTests
             It.IsAny<object>(),
             It.IsAny<System.Threading.CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GL01_PostPrescriptiveJournal_ValidatesBalanceAndPersistsAuditLog()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<LendGuardDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new LendGuardDbContext(options);
+        var auditMock = new Mock<IAuditService>();
+        var aiMock = new Mock<IAiClientService>();
+        var notifMock = new Mock<INotificationService>();
+        var service = new ExceptionService(context, auditMock.Object, aiMock.Object, notifMock.Object);
+
+        var exc = new DiscrepancyException
+        {
+            Id = Guid.NewGuid(),
+            ReconciliationRunId = Guid.NewGuid(),
+            ExceptionType = ExceptionType.AmountMismatch,
+            Severity = ExceptionSeverity.High,
+            Status = ExceptionStatus.Open,
+            DiscrepancyAmount = 250.00m
+        };
+        context.Exceptions.Add(exc);
+        await context.SaveChangesAsync();
+
+        var userId = Guid.NewGuid();
+
+        // Reject imbalanced lines
+        await Assert.ThrowsAsync<ArgumentException>(() => service.PostPrescriptiveJournalAsync(exc.Id, new PostJournalRequest
+        {
+            Currency = "INR",
+            Strategy = "Bad Balance",
+            Lines = new List<JournalLineDto>
+            {
+                new() { AccountCode = "5120", AccountName = "Fee", Debit = 250m, Credit = 0m },
+                new() { AccountCode = "1310", AccountName = "Receivable", Debit = 0m, Credit = 100m }
+            }
+        }, userId, UserRole.Admin));
+
+        // Act: valid balanced journal
+        var posted = await service.PostPrescriptiveJournalAsync(exc.Id, new PostJournalRequest
+        {
+            Currency = "INR",
+            Strategy = "Gateway Fee Reclassification",
+            Memo = "Reconcile fee",
+            Lines = new List<JournalLineDto>
+            {
+                new() { AccountCode = "5120", AccountName = "Gateway Fee", Debit = 250m, Credit = 0m },
+                new() { AccountCode = "1020", AccountName = "Cash", Debit = 9750m, Credit = 0m },
+                new() { AccountCode = "1310", AccountName = "Receivable", Debit = 0m, Credit = 10000m }
+            }
+        }, userId, UserRole.Admin);
+
+        Assert.Equal("POSTED", posted.Status);
+        Assert.Equal(10000m, posted.TotalDebit);
+        Assert.Equal(10000m, posted.TotalCredit);
+        auditMock.Verify(a => a.LogAsync("JOURNAL_POSTED", "EXCEPTION", exc.Id, userId, It.IsAny<object>(), null, It.IsAny<System.Threading.CancellationToken>()), Times.Once);
+    }
 }

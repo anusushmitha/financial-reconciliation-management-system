@@ -1,17 +1,17 @@
 {
-  "timestamp": "2026-11-25 06:54:37 UTC",
+  "timestamp": "2026-11-25 07:21:06 UTC",
   "total_requests": 150,
   "concurrency": 10,
-  "wall_duration_seconds": 0.29,
-  "throughput_rps": 509.5,
+  "wall_duration_seconds": 0.27,
+  "throughput_rps": 563.9,
   "error_count": 0,
   "error_rate_pct": 0.0,
-  "min_ms": 7.61,
-  "mean_ms": 17.06,
-  "p50_ms": 14.72,
-  "p90_ms": 29.1,
-  "p95_ms": 38.28,
-  "p99_ms": 44.13,
-  "max_ms": 56.51,
-  "stdev_ms": 8.26
+  "min_ms": 6.67,
+  "mean_ms": 15.68,
+  "p50_ms": 14.04,
+  "p90_ms": 20.78,
+  "p95_ms": 30.74,
+  "p99_ms": 54.25,
+  "max_ms": 68.99,
+  "stdev_ms": 8.24
 }

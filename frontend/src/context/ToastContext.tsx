@@ -11,19 +11,37 @@ export interface ToastItem {
   durationMs?: number;
 }
 
+export interface NotificationHistoryItem extends ToastItem {
+  timestamp: number;
+  read: boolean;
+}
+
 interface ToastContextType {
   showToast: (title: string, message: string, type?: ToastType, durationMs?: number) => void;
   addToast: (message: string, type?: ToastType) => void;
   dismissToast: (id: string) => void;
+  history: NotificationHistoryItem[];
+  unreadCount: number;
+  markAllRead: () => void;
+  clearHistory: () => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [history, setHistory] = useState<NotificationHistoryItem[]>([]);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const markAllRead = useCallback(() => {
+    setHistory((prev) => prev.map((h) => ({ ...h, read: true })));
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setHistory([]);
   }, []);
 
   const showToast = useCallback(
@@ -31,6 +49,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const item: ToastItem = { id, title, message, type, durationMs };
       setToasts((prev) => [item, ...prev.slice(0, 4)]);
+      setHistory((prev) => [{ ...item, timestamp: Date.now(), read: false }, ...prev.slice(0, 24)]);
 
       if (durationMs > 0) {
         setTimeout(() => {
@@ -40,6 +59,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     },
     [dismissToast]
   );
+
+  const unreadCount = history.filter((h) => !h.read).length;
 
   const addToast = useCallback(
     (message: string, type: ToastType = 'info') => {
@@ -78,7 +99,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return (
-    <ToastContext.Provider value={{ showToast, addToast, dismissToast }}>
+    <ToastContext.Provider value={{ showToast, addToast, dismissToast, history, unreadCount, markAllRead, clearHistory }}>
       {children}
       {/* Toast Container Stack */}
       <div

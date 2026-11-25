@@ -24,6 +24,7 @@ public interface IExceptionService
     Task<ExceptionDetailDto> ResolveExceptionAsync(Guid id, ResolveExceptionRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default);
     Task<TriggerAiAnalysisResponse> TriggerAiAnalysisAsync(Guid id, TriggerAiAnalysisRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default);
     Task<List<AiAnalysisDto>> GetExceptionAnalysesAsync(Guid id, bool latestOnly = false, string? type = null, CancellationToken cancellationToken = default);
+    Task<PostJournalResponse> PostPrescriptiveJournalAsync(Guid id, PostJournalRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default);
 }
 
 public class ExceptionService : IExceptionService
@@ -612,6 +613,62 @@ public class ExceptionService : IExceptionService
                 Status = e.ExternalTransaction.Status,
                 ImportBatchId = e.ExternalTransaction.ImportBatchId
             } : null
+        };
+    }
+
+    public async Task<PostJournalResponse> PostPrescriptiveJournalAsync(Guid id, PostJournalRequest request, Guid currentUserId, string currentUserRole = UserRole.Admin, CancellationToken cancellationToken = default)
+    {
+        if (request.Lines == null || request.Lines.Count < 2)
+        {
+            throw new ArgumentException("A valid double-entry journal requires at least two ledger lines.");
+        }
+
+        var exception = await _context.Exceptions.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+        if (exception == null)
+        {
+            throw new KeyNotFoundException("Exception not found.");
+        }
+
+        if (currentUserRole == UserRole.Analyst && exception.AssignedTo.HasValue && exception.AssignedTo.Value != currentUserId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to post journals for an exception assigned to another analyst.");
+        }
+
+        decimal totalDebit = request.Lines.Sum(l => l.Debit);
+        decimal totalCredit = request.Lines.Sum(l => l.Credit);
+
+        if (totalDebit <= 0 || Math.Abs(totalDebit - totalCredit) > 0.001m)
+        {
+            throw new ArgumentException($"Trial balance verification failed: Debits ({totalDebit:0.00}) must equal Credits ({totalCredit:0.00}).");
+        }
+
+        var journalRef = $"JE-LG-{id.ToString()[..8].ToUpperInvariant()}-{DateTimeOffset.UtcNow:HHmmss}";
+        var now = DateTimeOffset.UtcNow;
+
+        await _auditService.LogAsync("JOURNAL_POSTED", "EXCEPTION", id, currentUserId, new
+        {
+            journalEntryRef = journalRef,
+            currency = request.Currency,
+            strategy = request.Strategy,
+            memo = request.Memo,
+            totalDebit,
+            totalCredit,
+            lines = request.Lines
+        }, null, cancellationToken);
+
+        if (_notificationService != null)
+        {
+            await _notificationService.BroadcastEventAsync("JOURNAL_POSTED", "GL Journal Recorded", $"Balanced entry {journalRef} ({request.Currency} {totalDebit:0.00}) logged to immutable ledger.", new { exceptionId = id, journalEntryRef = journalRef }, cancellationToken);
+        }
+
+        return new PostJournalResponse
+        {
+            JournalEntryRef = journalRef,
+            ExceptionId = id,
+            TotalDebit = totalDebit,
+            TotalCredit = totalCredit,
+            Status = "POSTED",
+            PostedAt = now
         };
     }
 }

@@ -4,6 +4,7 @@ using LendGuard.Application.DTOs;
 using LendGuard.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LendGuard.Api.Controllers;
 
@@ -20,6 +21,7 @@ public class AuthController : ApiControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var response = await _authService.LoginAsync(request, cancellationToken);
@@ -43,6 +45,7 @@ public class AuthController : ApiControllerBase
 
     [HttpPost("forgot-password")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<ActionResult<MessageResponse>> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
         var response = await _authService.ForgotPasswordAsync(request, cancellationToken);
@@ -54,6 +57,14 @@ public class AuthController : ApiControllerBase
     public async Task<ActionResult<MessageResponse>> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
     {
         var response = await _authService.ResetPasswordAsync(request, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult<MessageResponse>> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _authService.ChangePasswordAsync(CurrentUserId, request, cancellationToken);
         return Ok(response);
     }
 }

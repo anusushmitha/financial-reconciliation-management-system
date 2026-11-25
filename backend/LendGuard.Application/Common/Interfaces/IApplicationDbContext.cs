@@ -21,6 +21,7 @@ public interface IApplicationDbContext
     DbSet<AiAnalysis> AiAnalyses { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<BackgroundJob> BackgroundJobs { get; }
+    DbSet<ReconciliationPolicy> ReconciliationPolicies { get; }
 
     DatabaseFacade Database { get; }
 

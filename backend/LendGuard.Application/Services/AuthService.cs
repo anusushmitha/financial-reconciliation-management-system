@@ -16,6 +16,7 @@ public interface IAuthService
     Task<UserProfileDto> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<MessageResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default);
     Task<MessageResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default);
+    Task<MessageResponse> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);
 }
 
 public class AuthService : IAuthService
@@ -103,14 +104,52 @@ public class AuthService : IAuthService
 
             _context.PasswordResetTokens.Add(resetToken);
             await _context.SaveChangesAsync(cancellationToken);
-
-            // In local/dev environments we log the reset token safely for verification
-            // Production will route through verified SMTP sender
+            await _auditService.LogAsync("PASSWORD_RESET_REQUESTED", "USER", user.Id, user.Id, new { email = normalizedEmail, expiresAt = resetToken.ExpiresAt }, null, cancellationToken);
         }
 
         return new MessageResponse
         {
             Message = "If the account exists, reset instructions will be sent."
+        };
+    }
+
+    public async Task<MessageResponse> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+        {
+            throw new ArgumentException("Current password is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+        {
+            throw new ArgumentException("New password must be at least 8 characters long.");
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (user == null || !user.IsActive)
+        {
+            throw new KeyNotFoundException("User account not found or inactive.");
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+        {
+            throw new UnauthorizedAccessException("Current password is incorrect.");
+        }
+
+        if (request.CurrentPassword == request.NewPassword)
+        {
+            throw new ArgumentException("New password must differ from the current password.");
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync("PASSWORD_CHANGED", "USER", user.Id, user.Id, null, null, cancellationToken);
+
+        return new MessageResponse
+        {
+            Message = "Password changed successfully."
         };
     }
 

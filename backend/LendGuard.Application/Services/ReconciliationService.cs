@@ -76,7 +76,20 @@ public class ReconciliationService : IReconciliationService
             throw new InvalidOperationException("A reconciliation run is already active for this batch pair.");
         }
 
-        double tolerance = request.DateToleranceDays ?? 0.0;
+        var policy = await _context.ReconciliationPolicies
+            .AsNoTracking()
+            .OrderByDescending(p => p.UpdatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var dateTol = request.DateToleranceDays ?? (policy != null ? policy.DateSlippageDays : 0.0);
+        decimal pctTol = policy?.AmountTolerancePercent ?? 0.00m;
+        decimal capTol = policy?.FixedRupeeTolerance ?? 0.00m;
+        var compactRuleVersion = $"v2;d={dateTol:0.#};p={pctTol:0.##};c={capTol:0.##}";
+        if (compactRuleVersion.Length > 40)
+        {
+            compactRuleVersion = compactRuleVersion[..40];
+        }
+
         var run = new ReconciliationRun
         {
             Id = Guid.NewGuid(),
@@ -84,7 +97,7 @@ public class ReconciliationService : IReconciliationService
             ExternalBatchId = request.ExternalBatchId,
             Status = ReconciliationRunStatus.Queued,
             StartedBy = userId,
-            RuleVersion = $"recon-v1;tolerance={tolerance:0.#}d",
+            RuleVersion = compactRuleVersion,
             StartedAt = DateTimeOffset.UtcNow
         };
 
@@ -156,13 +169,36 @@ public class ReconciliationService : IReconciliationService
             run.TotalInternal = internalTxns.Count;
             run.TotalExternal = externalTxns.Count;
 
-            double dateToleranceDays = 0.0; // Baseline default is zero-day (same calendar date)
-            if (!string.IsNullOrEmpty(run.RuleVersion) && run.RuleVersion.Contains("tolerance="))
+            var dateToleranceDays = 0.0; // Baseline default is zero-day (same calendar date)
+            decimal policyPct = 0.00m;
+            decimal policyCap = 0.00m;
+            if (!string.IsNullOrEmpty(run.RuleVersion))
             {
-                var match = System.Text.RegularExpressions.Regex.Match(run.RuleVersion, @"tolerance=(\d+(?:\.\d+)?)");
-                if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                if (run.RuleVersion.Contains("tolerance="))
                 {
-                    dateToleranceDays = parsed;
+                    var match = System.Text.RegularExpressions.Regex.Match(run.RuleVersion, @"tolerance=(\d+(?:\.\d+)?)");
+                    if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                    {
+                        dateToleranceDays = parsed;
+                    }
+                }
+                else
+                {
+                    var dMatch = System.Text.RegularExpressions.Regex.Match(run.RuleVersion, @"d=(\d+(?:\.\d+)?)");
+                    if (dMatch.Success && double.TryParse(dMatch.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedD))
+                    {
+                        dateToleranceDays = parsedD;
+                    }
+                    var pMatch = System.Text.RegularExpressions.Regex.Match(run.RuleVersion, @"p=(\d+(?:\.\d+)?)");
+                    if (pMatch.Success && decimal.TryParse(pMatch.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedP))
+                    {
+                        policyPct = parsedP;
+                    }
+                    var cMatch = System.Text.RegularExpressions.Regex.Match(run.RuleVersion, @"c=(\d+(?:\.\d+)?)");
+                    if (cMatch.Success && decimal.TryParse(cMatch.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedC))
+                    {
+                        policyCap = parsedC;
+                    }
                 }
             }
 
@@ -277,27 +313,34 @@ public class ReconciliationService : IReconciliationService
                 {
                     var extTxn = candidates.First();
                     var dateDiff = Math.Abs((intTxn.TransactionDate.Date - extTxn.TransactionDate.Date).TotalDays);
+                    var diff = Math.Abs(intTxn.Amount - extTxn.Amount);
+                    var allowedDiff = Math.Max(intTxn.Amount * policyPct / 100m, policyCap);
+                    var withinAmountPolicy = (intTxn.Amount == extTxn.Amount) || ((policyPct > 0m || policyCap > 0m) && diff <= allowedDiff);
 
-                    if (intTxn.Amount == extTxn.Amount)
+                    if (withinAmountPolicy)
                     {
                         if (dateDiff <= dateToleranceDays)
                         {
-                            // RC-01 & RC-02: EXACT MATCH (within configured date tolerance window)
+                            // RC-01 & RC-02: EXACT / TOLERANCE MATCH (within configured date and policy variance thresholds)
                             intTxn.Status = TransactionStatus.Matched;
                             extTxn.Status = TransactionStatus.Matched;
                             matchedInternalIds.Add(intTxn.Id);
                             matchedExternalIds.Add(extTxn.Id);
 
+                            var isExact = intTxn.Amount == extTxn.Amount;
                             var match = new ReconciliationMatch
                             {
                                 Id = Guid.NewGuid(),
                                 ReconciliationRunId = run.Id,
                                 MatchType = Domain.MatchType.Exact,
-                                Confidence = 100.00m,
+                                Confidence = isExact ? 100.00m : 97.50m,
                                 Evidence = JsonSerializer.Serialize(new
                                 {
                                     referenceMatch = true,
-                                    amountMatch = true,
+                                    amountMatch = isExact,
+                                    withinTolerance = !isExact,
+                                    allowedVariance = allowedDiff,
+                                    actualVariance = diff,
                                     currencyMatch = true,
                                     internalAmount = intTxn.Amount,
                                     externalAmount = extTxn.Amount,
@@ -307,8 +350,8 @@ public class ReconciliationService : IReconciliationService
                                 CreatedAt = DateTimeOffset.UtcNow,
                                 MatchItems = new List<ReconciliationMatchItem>
                                 {
-                                    new() { Id = Guid.NewGuid(), TransactionId = intTxn.Id, Side = SourceType.Internal, AmountApplied = intTxn.Amount },
-                                    new() { Id = Guid.NewGuid(), TransactionId = extTxn.Id, Side = SourceType.External, AmountApplied = extTxn.Amount }
+                                    new() { Id = Guid.NewGuid(), TransactionId = intTxn.Id, Side = SourceType.Internal, AmountApplied = extTxn.Amount > 0 ? Math.Min(intTxn.Amount, extTxn.Amount) : intTxn.Amount },
+                                    new() { Id = Guid.NewGuid(), TransactionId = extTxn.Id, Side = SourceType.External, AmountApplied = extTxn.Amount > 0 ? Math.Min(intTxn.Amount, extTxn.Amount) : extTxn.Amount }
                                 }
                             };
                             matches.Add(match);
@@ -346,7 +389,6 @@ public class ReconciliationService : IReconciliationService
                         matchedInternalIds.Add(intTxn.Id);
                         matchedExternalIds.Add(extTxn.Id);
 
-                        var diff = Math.Abs(intTxn.Amount - extTxn.Amount);
                         exceptions.Add(new DiscrepancyException
                         {
                             Id = Guid.NewGuid(),

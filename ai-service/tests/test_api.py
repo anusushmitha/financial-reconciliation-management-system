@@ -142,3 +142,58 @@ def test_calibrate_endpoint_fits_live_portfolio():
     assert data["calibrationMode"] == "live-portfolio-blended"
     from app.services.anomaly_detector import anomaly_detector_service
     assert anomaly_detector_service.validation_roc_auc >= 0.90
+
+
+def test_exception_explanation_with_policy_and_historical_context():
+    headers = {"X-Service-Key": settings.ai_service_key}
+    payload = {
+        "analysisId": "3fa85f64-5717-4562-b3fc-2c963f66afb2",
+        "exceptionType": "AMOUNT_MISMATCH",
+        "evidence": {
+            "referenceMatch": True,
+            "internalAmount": "50000.00",
+            "externalAmount": "48500.00",
+            "currency": "INR",
+            "dateDifferenceDays": 2,
+            "policyContext": {
+                "profileId": "strict",
+                "amountTolerancePercent": 0.5,
+                "fixedRupeeTolerance": 50.0,
+                "dateSlippageDays": 1,
+            },
+            "historicalResolutions": [
+                {
+                    "exceptionType": "AMOUNT_MISMATCH",
+                    "resolutionCategory": "BANK_FEE_DEDUCTION",
+                    "resolutionExplanation": "Correspondent bank deducted INR 1,500 wire fee.",
+                }
+            ],
+            "anomalyContext": {"anomalyScore": 0.86, "riskLevel": "CRITICAL"},
+        },
+    }
+    res = client.post("/internal/v1/exception-explanation", json=payload, headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "COMPLETED"
+    assert "policyContext" in data["evidenceReferences"]
+    assert "historicalResolutions" in data["evidenceReferences"]
+    assert "anomalyContext" in data["evidenceReferences"]
+
+
+def test_calibrate_with_analyst_feedback_labels():
+    headers = {"X-Service-Key": settings.ai_service_key}
+    samples = [
+        {"amount": 15000.0 + (i * 500.0), "currency": "INR", "deviation": 0.0, "dateDifferenceDays": 0.0, "isAnomaly": False, "resolutionCategory": "TIMING_LAG"}
+        for i in range(12)
+    ] + [
+        {"amount": 250000.0, "currency": "INR", "deviation": 45000.0, "dateDifferenceDays": 5.0, "isAnomaly": True, "resolutionCategory": "CONFIRMED_OUTLIER"},
+        {"amount": 180000.0, "currency": "EUR", "deviation": 25000.0, "dateDifferenceDays": 4.0, "isAnomaly": True, "resolutionCategory": "CONFIRMED_OUTLIER"},
+        {"amount": 120000.0, "currency": "USD", "deviation": 18000.0, "dateDifferenceDays": 3.0, "isAnomaly": True, "resolutionCategory": "CONFIRMED_OUTLIER"},
+    ]
+    res = client.post("/internal/v1/calibrate", json={"samples": samples}, headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "CALIBRATED"
+    assert data["calibrationMode"] == "live-feedback-hybrid"
+    from app.services.anomaly_detector import anomaly_detector_service
+    assert anomaly_detector_service.validation_roc_auc >= 0.90

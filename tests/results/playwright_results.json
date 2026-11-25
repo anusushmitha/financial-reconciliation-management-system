@@ -3,8 +3,7 @@
     "argv": [
       "C:\\Program Files\\nodejs\\node.exe",
       "C:\\Users\\LENOVO\\.gemini\\antigravity\\scratch\\lendguard-ai\\frontend\\node_modules\\@playwright\\test\\cli.js",
-      "test",
-      "tests/staging_demo_screens.spec.ts"
+      "test"
     ],
     "configFile": "C:\\Users\\LENOVO\\.gemini\\antigravity\\scratch\\lendguard-ai\\frontend\\playwright.config.ts",
     "rootDir": "C:/Users/LENOVO/.gemini/antigravity/scratch/lendguard-ai/frontend/tests",
@@ -18,7 +17,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 1
+      "actualWorkers": 4
     },
     "preserveOutput": "always",
     "projects": [
@@ -27,7 +26,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "chromium",
         "name": "chromium",
@@ -47,7 +46,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "name": "chromium",
         "testDir": "C:\\Users\\LENOVO\\.gemini\\antigravity\\scratch\\lendguard-ai\\frontend\\tests",
@@ -105,6 +104,499 @@
   },
   "suites": [
     {
+      "title": "comprehensive_18_screens.spec.ts",
+      "file": "comprehensive_18_screens.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "LENDGUARD AI — Full 18-Screen End-to-End Verification Suite",
+          "file": "comprehensive_18_screens.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Public Auth Screens — S01 (Login), S02 (Forgot Password), S03 (Reset Password)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3496,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:22.782Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6fad4aae6b17b1dd6662-99f4631f7c4f1dbca991",
+              "file": "comprehensive_18_screens.spec.ts",
+              "line": 64,
+              "column": 3
+            },
+            {
+              "title": "Comprehensive Interactive Journey — S04 to S18",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5232,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:26.887Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6fad4aae6b17b1dd6662-1ef64ab416f715489d07",
+              "file": "comprehensive_18_screens.spec.ts",
+              "line": 87,
+              "column": 3
+            },
+            {
+              "title": "Analyst Role Restrictions — Route Guards & Backend RBAC",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1074,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:32.132Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6fad4aae6b17b1dd6662-fa75a766f651965a6268",
+              "file": "comprehensive_18_screens.spec.ts",
+              "line": 206,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "e2e_enterprise_features.spec.ts",
+      "file": "e2e_enterprise_features.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "LENDGUARD AI — Enterprise Max-Roof Capabilities E2E Verification",
+          "file": "e2e_enterprise_features.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "01. Brand Title, Live Telemetry Pill, Notification Inbox, Tour & Demo Reset Modal",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4399,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:22.772Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2d8a213e60d9c0a35312-c091f5af38f6be47442b",
+              "file": "e2e_enterprise_features.spec.ts",
+              "line": 16,
+              "column": 3
+            },
+            {
+              "title": "02. Policy & Reconciliation Rule Builder (/rules) Database Persistence & Reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2377,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:27.320Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2d8a213e60d9c0a35312-f1ba98673846ba322394",
+              "file": "e2e_enterprise_features.spec.ts",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "03. Imports Page Client-Side Pre-Flight CSV Schema Inspector",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1221,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:29.713Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2d8a213e60d9c0a35312-f88d07cf037e2d88975a",
+              "file": "e2e_enterprise_features.spec.ts",
+              "line": 73,
+              "column": 3
+            },
+            {
+              "title": "04. Exception Detail Dual-Engine AI, GL Posting & Prescriptive Double-Entry Journal",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 10501,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:30.945Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2d8a213e60d9c0a35312-bee0421199abf0d517c1",
+              "file": "e2e_enterprise_features.spec.ts",
+              "line": 99,
+              "column": 3
+            },
+            {
+              "title": "05. Reports Executive Statement PDF Dossier Modal & SOX Attestation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1531,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:41.463Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2d8a213e60d9c0a35312-ee199c41703a5df9ddfc",
+              "file": "e2e_enterprise_features.spec.ts",
+              "line": 138,
+              "column": 3
+            },
+            {
+              "title": "06. New Reconciliation Run Modal Populates Real IMPORTED Batches & Active DB Policy",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1604,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:43.012Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2d8a213e60d9c0a35312-69dea4ee8e8064a2fbe2",
+              "file": "e2e_enterprise_features.spec.ts",
+              "line": 156,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "e2e_rbac.spec.ts",
+      "file": "e2e_rbac.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "LENDGUARD AI — E2E Screen Navigation & RBAC Verification",
+          "file": "e2e_rbac.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Public Auth Screens (S01, S02, S03)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 3579,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:22.788Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e1b1a2dabbdd28d9dd3a-7cea9201a7f860d4d5ad",
+              "file": "e2e_rbac.spec.ts",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "Admin Journey — Screen Coverage S04 to S18",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 1413,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:26.520Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e1b1a2dabbdd28d9dd3a-b196ddfad4c1049b0f90",
+              "file": "e2e_rbac.spec.ts",
+              "line": 21,
+              "column": 3
+            },
+            {
+              "title": "Analyst RBAC Enforcement — Blocked from Admin Screens & APIs",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 1298,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:27.944Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e1b1a2dabbdd28d9dd3a-70693e82b05f44ecbe40",
+              "file": "e2e_rbac.spec.ts",
+              "line": 65,
+              "column": 3
+            },
+            {
+              "title": "Admin Forbidden Actions — Prevent Self-Deactivation & Disabling Last Admin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 191,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-25T12:01:29.258Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e1b1a2dabbdd28d9dd3a-30d69d8056832045d492",
+              "file": "e2e_rbac.spec.ts",
+              "line": 117,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
       "title": "staging_demo_screens.spec.ts",
       "file": "staging_demo_screens.spec.ts",
       "column": 0,
@@ -130,15 +622,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 644,
+                      "duration": 3154,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:21.229Z",
+                      "startTime": "2026-11-25T12:01:22.787Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -164,15 +656,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 825,
+                      "duration": 1051,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:22.253Z",
+                      "startTime": "2026-11-25T12:01:26.477Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -198,15 +690,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 816,
+                      "duration": 1373,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:23.088Z",
+                      "startTime": "2026-11-25T12:01:27.540Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -232,15 +724,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 899,
+                      "duration": 1252,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:23.912Z",
+                      "startTime": "2026-11-25T12:01:28.927Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -266,15 +758,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1892,
+                      "duration": 2414,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:24.822Z",
+                      "startTime": "2026-11-25T12:01:30.192Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -284,7 +776,7 @@
               ],
               "id": "176700eba11777cc0590-8206ead3b9b4007a7073",
               "file": "staging_demo_screens.spec.ts",
-              "line": 81,
+              "line": 82,
               "column": 3
             },
             {
@@ -300,15 +792,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1781,
+                      "duration": 1873,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:26.724Z",
+                      "startTime": "2026-11-25T12:01:32.620Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -318,7 +810,7 @@
               ],
               "id": "176700eba11777cc0590-252d67cbc8ed2080ed31",
               "file": "staging_demo_screens.spec.ts",
-              "line": 99,
+              "line": 100,
               "column": 3
             },
             {
@@ -334,15 +826,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1804,
+                      "duration": 1887,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:28.515Z",
+                      "startTime": "2026-11-25T12:01:34.508Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -352,7 +844,7 @@
               ],
               "id": "176700eba11777cc0590-2c217ea93b8aa192b4ee",
               "file": "staging_demo_screens.spec.ts",
-              "line": 111,
+              "line": 112,
               "column": 3
             },
             {
@@ -368,15 +860,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1783,
+                      "duration": 1858,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:30.330Z",
+                      "startTime": "2026-11-25T12:01:36.408Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -386,7 +878,7 @@
               ],
               "id": "176700eba11777cc0590-4cf8131810e319521530",
               "file": "staging_demo_screens.spec.ts",
-              "line": 123,
+              "line": 124,
               "column": 3
             },
             {
@@ -402,15 +894,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1812,
+                      "duration": 1840,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-19T11:11:32.127Z",
+                      "startTime": "2026-11-25T12:01:38.278Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -420,7 +912,7 @@
               ],
               "id": "176700eba11777cc0590-637b73092286088504bb",
               "file": "staging_demo_screens.spec.ts",
-              "line": 135,
+              "line": 136,
               "column": 3
             }
           ]
@@ -430,9 +922,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-19T11:11:20.710Z",
-    "duration": 13328.422999999999,
-    "expected": 9,
+    "startTime": "2026-11-25T12:01:22.127Z",
+    "duration": 22586.546,
+    "expected": 22,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

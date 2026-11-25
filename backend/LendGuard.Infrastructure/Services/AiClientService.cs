@@ -10,7 +10,9 @@ using LendGuard.Application.Common.Interfaces;
 using LendGuard.Application.DTOs;
 using LendGuard.Domain;
 using LendGuard.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace LendGuard.Infrastructure.Services;
@@ -20,11 +22,17 @@ public class AiClientService : IAiClientService
     private readonly HttpClient _httpClient;
     private readonly string _serviceKey;
     private readonly ILogger<AiClientService> _logger;
+    private readonly IServiceScopeFactory? _scopeFactory;
 
-    public AiClientService(HttpClient httpClient, IConfiguration configuration, ILogger<AiClientService> logger)
+    public AiClientService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<AiClientService> logger,
+        IServiceScopeFactory? scopeFactory = null)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _scopeFactory = scopeFactory;
         _serviceKey = configuration["AI_SERVICE_KEY"] ?? "lendguard_internal_ai_secret_key_2026";
 
         var baseUrl = configuration["AI_SERVICE_BASE_URL"] ?? "http://localhost:8000";
@@ -138,6 +146,75 @@ public class AiClientService : IAiClientService
     public async Task<AiAnalysisDto> ExplainExceptionAsync(DiscrepancyException exception, Transaction? internalTxn, Transaction? externalTxn, CancellationToken cancellationToken = default)
     {
         var analysisId = Guid.NewGuid();
+        object? policyContext = null;
+        List<object>? historicalResolutions = null;
+        object? anomalyContext = null;
+
+        if (_scopeFactory != null)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetService<IApplicationDbContext>();
+                if (db != null)
+                {
+                    var activePolicy = await db.ReconciliationPolicies
+                        .AsNoTracking()
+                        .OrderByDescending(p => p.UpdatedAt)
+                        .FirstOrDefaultAsync(cancellationToken);
+                    if (activePolicy != null)
+                    {
+                        policyContext = new
+                        {
+                            profileId = activePolicy.ProfileId,
+                            amountTolerancePercent = activePolicy.AmountTolerancePercent,
+                            fixedRupeeTolerance = activePolicy.FixedRupeeTolerance,
+                            dateSlippageDays = activePolicy.DateSlippageDays,
+                            outlierThreshold = activePolicy.IsolationForestOutlierThreshold
+                        };
+                    }
+
+                    var pastResolved = await db.Exceptions
+                        .AsNoTracking()
+                        .Where(e => e.Status == ExceptionStatus.Resolved && e.Id != exception.Id)
+                        .OrderByDescending(e => e.ExceptionType == exception.ExceptionType)
+                        .ThenByDescending(e => e.ResolvedAt)
+                        .Take(3)
+                        .Select(e => new
+                        {
+                            exceptionType = e.ExceptionType,
+                            resolutionCategory = e.ResolutionCategory,
+                            resolutionExplanation = e.ResolutionExplanation,
+                            discrepancyAmount = e.DiscrepancyAmount
+                        })
+                        .ToListAsync(cancellationToken);
+                    if (pastResolved.Count > 0)
+                    {
+                        historicalResolutions = pastResolved.Cast<object>().ToList();
+                    }
+
+                    var latestAnomaly = await db.AiAnalyses
+                        .AsNoTracking()
+                        .Where(a => a.ExceptionId == exception.Id && a.AnalysisType == AiAnalysisType.Anomaly)
+                        .OrderByDescending(a => a.CreatedAt)
+                        .Select(a => new { a.ModelName, a.Result })
+                        .FirstOrDefaultAsync(cancellationToken);
+                    if (latestAnomaly != null)
+                    {
+                        anomalyContext = new
+                        {
+                            modelName = latestAnomaly.ModelName,
+                            summary = latestAnomaly.Result
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Skipping optional DB context enrichment for AI explanation.");
+            }
+        }
+
         var payload = new
         {
             analysisId = analysisId.ToString(),
@@ -148,7 +225,11 @@ public class AiClientService : IAiClientService
                 internalAmount = internalTxn?.Amount.ToString("F2") ?? exception.ExpectedAmount?.ToString("F2") ?? "0.00",
                 externalAmount = externalTxn?.Amount.ToString("F2") ?? exception.ActualAmount?.ToString("F2") ?? "0.00",
                 currency = internalTxn?.Currency ?? externalTxn?.Currency ?? "INR",
-                dateDifferenceDays = (internalTxn != null && externalTxn != null) ? (int)Math.Abs((internalTxn.TransactionDate - externalTxn.TransactionDate).TotalDays) : 0
+                dateDifferenceDays = (internalTxn != null && externalTxn != null) ? (int)Math.Abs((internalTxn.TransactionDate - externalTxn.TransactionDate).TotalDays) : 0,
+                transactionType = internalTxn?.TransactionType ?? externalTxn?.TransactionType,
+                policyContext,
+                historicalResolutions,
+                anomalyContext
             }
         };
 
@@ -218,8 +299,55 @@ public class AiClientService : IAiClientService
             amount = (double)t.Amount,
             currency = string.IsNullOrWhiteSpace(t.Currency) ? "INR" : t.Currency.Trim().ToUpperInvariant(),
             deviation = 0.0,
-            dateDifferenceDays = 0.0
+            dateDifferenceDays = 0.0,
+            isAnomaly = (bool?)null,
+            resolutionCategory = (string?)null
         }).ToList();
+
+        if (_scopeFactory != null)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetService<IApplicationDbContext>();
+                if (db != null)
+                {
+                    var resolvedExceptions = await db.Exceptions
+                        .AsNoTracking()
+                        .Include(e => e.InternalTransaction)
+                        .Include(e => e.ExternalTransaction)
+                        .Where(e => e.Status == ExceptionStatus.Resolved)
+                        .OrderByDescending(e => e.ResolvedAt)
+                        .Take(200)
+                        .ToListAsync(cancellationToken);
+
+                    foreach (var ex in resolvedExceptions)
+                    {
+                        var txn = ex.InternalTransaction ?? ex.ExternalTransaction;
+                        var cat = (ex.ResolutionCategory ?? string.Empty).Trim().ToUpperInvariant();
+                        var isFalsePositiveOrTiming = cat.Contains("TIMING") || cat.Contains("FALSE") || cat.Contains("TOLERANCE") || cat.Contains("CLEARED");
+                        var isConfirmedAnomaly = !isFalsePositiveOrTiming && ((ex.DiscrepancyAmount ?? 0m) > 0m || cat.Contains("FRAUD") || cat.Contains("DUPLICATE") || cat.Contains("WRITE_OFF"));
+                        var dateDiff = (ex.InternalTransaction != null && ex.ExternalTransaction != null)
+                            ? Math.Abs((ex.InternalTransaction.TransactionDate - ex.ExternalTransaction.TransactionDate).TotalDays)
+                            : 0.0;
+
+                        samples.Add(new
+                        {
+                            amount = (double)(txn?.Amount ?? ex.ExpectedAmount ?? ex.ActualAmount ?? 0m),
+                            currency = string.IsNullOrWhiteSpace(txn?.Currency) ? "INR" : txn!.Currency.Trim().ToUpperInvariant(),
+                            deviation = (double)(ex.DiscrepancyAmount ?? 0m),
+                            dateDifferenceDays = dateDiff,
+                            isAnomaly = (bool?)isConfirmedAnomaly,
+                            resolutionCategory = ex.ResolutionCategory
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Skipping optional labeled exception feedback during calibration.");
+            }
+        }
 
         if (samples.Count == 0)
         {

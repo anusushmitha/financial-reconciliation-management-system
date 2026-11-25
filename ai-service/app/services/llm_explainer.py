@@ -52,10 +52,10 @@ class LLMExplainerService:
         evidence_dict = {k: v for k, v in evidence.model_dump().items() if v is not None}
         system_prompt = (
             "You are an expert Financial Reconciliation and Audit AI for LendGuard. "
-            "Analyze the provided discrepancy evidence and produce a concise, strictly factual audit explanation. "
+            "Analyze the provided discrepancy evidence, active reconciliation policyContext, ML anomalyContext, and historicalResolutions (if provided) to produce a concise, strictly factual audit explanation. "
             "Output ONLY a raw valid JSON object with exactly two keys: 'summary' and 'recommendation'. "
-            "- 'summary': 1-2 factual sentences explaining the exact variance, numbers, and currency.\n"
-            "- 'recommendation': 1 actionable next step for the finance operations team.\n"
+            "- 'summary': 1-2 factual sentences explaining the exact variance, currency, active policy tolerance breach (if any), and relevant ML/historical context.\n"
+            "- 'recommendation': 1 actionable next step for the finance operations team grounded in the historical resolution patterns or policy rules.\n"
             "Rules: Zero PII, no speculation, strict financial audit terminology. Do not output markdown code blocks."
         )
         user_prompt = f"Exception Type: {exception_type}\nEvidence: {json.dumps(evidence_dict)}"
@@ -178,6 +178,12 @@ class LLMExplainerService:
             evidence_refs.append("referenceMatch")
         if evidence.candidateCount is not None:
             evidence_refs.append("candidateCount")
+        if evidence.policyContext is not None:
+            evidence_refs.append("policyContext")
+        if evidence.historicalResolutions:
+            evidence_refs.append("historicalResolutions")
+        if evidence.anomalyContext is not None:
+            evidence_refs.append("anomalyContext")
         if not evidence_refs:
             evidence_refs = ["referenceMatch"]
 

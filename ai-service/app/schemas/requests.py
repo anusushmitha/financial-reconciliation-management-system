@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 
 class TransactionEvidence(BaseModel):
@@ -23,6 +23,10 @@ class ExplanationEvidence(BaseModel):
     dateDifferenceDays: Optional[int] = 0
     candidateCount: Optional[int] = None
     unmatchedSide: Optional[str] = None
+    transactionType: Optional[str] = None
+    policyContext: Optional[Dict[str, Any]] = None
+    historicalResolutions: Optional[List[Dict[str, Any]]] = None
+    anomalyContext: Optional[Dict[str, Any]] = None
 
 class ExceptionExplanationRequest(BaseModel):
     analysisId: str
@@ -35,6 +39,8 @@ class CalibrationSample(BaseModel):
     currency: str = "INR"
     deviation: float = 0.0
     dateDifferenceDays: float = 0.0
+    isAnomaly: Optional[bool] = None
+    resolutionCategory: Optional[str] = None
 
 
 class CalibrateModelRequest(BaseModel):

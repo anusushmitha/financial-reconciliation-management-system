@@ -1,9 +1,10 @@
 import numpy as np
 from sklearn.ensemble import IsolationForest
+from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import roc_auc_score
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from app.schemas.requests import TransactionEvidence
 from app.data.lending_corpus import FX_TO_INR, build_lending_training_corpus
 
@@ -15,6 +16,7 @@ class AnomalyDetectorService:
         self.calibration_mode = "multi-regime-lending-corpus"
         self.calibrated_sample_count = 0
         self.validation_roc_auc = 0.0
+        self.feedback_clf: Optional[LogisticRegression] = None
         self._init_baseline_model()
 
     def _build_feature_row(self, amt_inr: float, dev_inr: float, rel: float, drift: float, is_single: float, is_cross: float) -> np.ndarray:
@@ -74,6 +76,7 @@ class AnomalyDetectorService:
         return ensemble, iforest_norm, mahal_norm
 
     def _init_baseline_model(self):
+        self.feedback_clf = None
         X_normal, X_val, y_val, dev_med, dev_iqr = build_lending_training_corpus(seed=42)
         self.dev_median = dev_med
         self.dev_iqr = dev_iqr
@@ -83,11 +86,13 @@ class AnomalyDetectorService:
         self.validation_roc_auc = round(float(roc_auc_score(y_val, val_scores)), 4)
 
     def calibrate(self, samples: List[Dict[str, Any]]) -> Tuple[int, str, str]:
-        X_corpus, _, _, dev_med, dev_iqr = build_lending_training_corpus(seed=42)
+        X_corpus, X_val, y_val, dev_med, dev_iqr = build_lending_training_corpus(seed=42)
         self.dev_median = dev_med
         self.dev_iqr = dev_iqr
 
-        rows = []
+        normal_rows = []
+        feedback_X = []
+        feedback_y = []
         for s in samples:
             amt = max(float(s.get("amount", 0.0)), 0.0)
             curr = str(s.get("currency", "INR") or "INR").strip().upper()
@@ -97,16 +102,41 @@ class AnomalyDetectorService:
             drift = abs(float(s.get("dateDifferenceDays", 0.0)))
             rel = dev_inr / (amt_inr + 1.0) if amt_inr > 0 else 0.0
             is_cross = 1.0 if curr != "INR" else 0.0
-            rows.append(self._build_feature_row(amt_inr, dev_inr, rel, drift, 0.0, is_cross))
+            feat = self._build_feature_row(amt_inr, dev_inr, rel, drift, 0.0, is_cross)
 
-        if len(rows) < 10:
+            label = s.get("isAnomaly")
+            if label is True:
+                feedback_X.append(feat)
+                feedback_y.append(1)
+            elif label is False:
+                normal_rows.append(feat)
+                feedback_X.append(feat)
+                feedback_y.append(0)
+            else:
+                normal_rows.append(feat)
+
+        total_count = len(normal_rows) + len([y for y in feedback_y if y == 1])
+        if total_count < 10:
             self._init_baseline_model()
             return self.calibrated_sample_count, self.model_version, self.calibration_mode
 
-        X_live = np.array(rows, dtype=float)
-        # Blend real portfolio rows with stratified corpus anchor so small live portfolios remain well-regularized
-        X_blended = np.vstack([X_corpus[:600], X_live])
-        self._fit_matrix(X_blended, "live-portfolio-blended", len(rows))
+        X_live_normal = np.array(normal_rows if normal_rows else feedback_X, dtype=float)
+        # Blend real portfolio normal rows with stratified corpus anchor so small live portfolios remain well-regularized
+        X_blended = np.vstack([X_corpus[:600], X_live_normal])
+        mode = "live-portfolio-blended"
+        self._fit_matrix(X_blended, mode, total_count)
+
+        # Fit supervised analyst-feedback classifier when labeled resolutions are provided
+        self.feedback_clf = None
+        if len(feedback_y) >= 4 and len(set(feedback_y)) == 2:
+            X_fb = self.scaler.transform(np.array(feedback_X, dtype=float))
+            clf_fb = LogisticRegression(class_weight="balanced", max_iter=500, random_state=42)
+            clf_fb.fit(X_fb, np.array(feedback_y, dtype=int))
+            self.feedback_clf = clf_fb
+            self.calibration_mode = "live-feedback-hybrid"
+
+        val_scores = [self._raw_ensemble_score(row.reshape(1, -1))[0] for row in X_val]
+        self.validation_roc_auc = round(float(roc_auc_score(y_val, val_scores)), 4)
         return self.calibrated_sample_count, self.model_version, self.calibration_mode
 
     def analyze(self, evidence: TransactionEvidence, feature_context: Dict[str, Any] | None) -> Tuple[float, str, List[str], str, str, List[Dict[str, Any]], Dict[str, float]]:
@@ -182,6 +212,9 @@ class AnomalyDetectorService:
         sample_2d = sample.reshape(1, -1)
 
         ensemble_score, _, _ = self._raw_ensemble_score(sample_2d)
+        if self.feedback_clf is not None:
+            fb_prob = float(self.feedback_clf.predict_proba(self.scaler.transform(sample_2d))[0][1])
+            ensemble_score = (0.75 * ensemble_score) + (0.25 * fb_prob)
 
         # Calibrated domain floors scaled cleanly to INR-equivalent exposure severity
         if "CRITICAL_AMOUNT_DEVIATION" in signals:
@@ -260,11 +293,19 @@ class AnomalyDetectorService:
             }
         ]
 
-        ensemble_weights = {
-            "isolationForest": 0.45,
-            "localOutlierFactor": 0.30,
-            "robustMahalanobis": 0.25,
-        }
+        if self.feedback_clf is not None:
+            ensemble_weights = {
+                "isolationForest": 0.34,
+                "localOutlierFactor": 0.22,
+                "robustMahalanobis": 0.19,
+                "analystFeedbackClassifier": 0.25,
+            }
+        else:
+            ensemble_weights = {
+                "isolationForest": 0.45,
+                "localOutlierFactor": 0.30,
+                "robustMahalanobis": 0.25,
+            }
 
         return anomaly_score, risk_level, signals, self.algorithm, self.model_version, feature_attributions, ensemble_weights
 

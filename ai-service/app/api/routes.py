@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Header, HTTPException, status
 from app.config import settings
-from app.schemas.requests import AnomalyDetectionRequest, ExceptionExplanationRequest
+from app.schemas.requests import AnomalyDetectionRequest, ExceptionExplanationRequest, CalibrateModelRequest
 from app.schemas.responses import (
     HealthResponse,
     AnomalyDetectionResponse,
     ExceptionExplanationResponse,
+    CalibrateModelResponse,
 )
 from app.services.anomaly_detector import anomaly_detector_service
 from app.services.llm_explainer import llm_explainer_service
@@ -66,4 +67,19 @@ def explain_exception(
         modelVersion=model_used,
         executionTimeMs=elapsed_ms,
         provider=provider
+    )
+
+
+@router.post("/calibrate", response_model=CalibrateModelResponse)
+def calibrate_model(
+    request: CalibrateModelRequest,
+    x_service_key: str | None = Header(None, alias="X-Service-Key")
+):
+    verify_service_key(x_service_key)
+    count, model_ver, mode = anomaly_detector_service.calibrate([s.model_dump() for s in request.samples])
+    return CalibrateModelResponse(
+        status="CALIBRATED",
+        sampleCount=count,
+        modelVersion=model_ver,
+        calibrationMode=mode,
     )

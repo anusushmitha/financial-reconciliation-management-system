@@ -32,3 +32,10 @@ class ExceptionExplanationResponse(BaseModel):
     modelVersion: str = "nvidia/nemotron-3.5-bolt-e4b"
     executionTimeMs: Optional[int] = None
     provider: str = "nvidia"
+
+
+class CalibrateModelResponse(BaseModel):
+    status: str = "CALIBRATED"
+    sampleCount: int
+    modelVersion: str
+    calibrationMode: str

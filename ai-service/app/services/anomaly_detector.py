@@ -3,41 +3,28 @@ from sklearn.ensemble import IsolationForest
 from typing import Dict, Any, List, Tuple
 from app.schemas.requests import TransactionEvidence
 
+FX_TO_INR = {
+    "INR": 1.0,
+    "USD": 84.0,
+    "EUR": 90.0,
+    "GBP": 106.0,
+}
+
+
 class AnomalyDetectorService:
     def __init__(self):
         self.model_version = "scikit-learn/isolation-forest-v2.0-enterprise"
         self.algorithm = "Tri-Model Outlier Ensemble (iForest + Robust Covariance)"
+        self.calibration_mode = "synthetic-baseline"
+        self.calibrated_sample_count = 0
         self._init_baseline_model()
 
-    def _init_baseline_model(self):
-        # Baseline training data: standard lending repayments
-        # Features: [log1p(amount), deviation_amount, relative_deviation, date_drift_days]
-        rng = np.random.RandomState(42)
-        n_samples = 500
-        # Normal loan repayments: 5,000 to 50,000 INR
-        normal_amounts = rng.normal(loc=18000, scale=6000, size=(n_samples, 1))
-        normal_amounts = np.clip(normal_amounts, 1000, 100000)
-        log_amounts = np.log1p(normal_amounts)
-        
-        # Normal deviations: 0 to 15 INR (fractional rounding or small fee variances)
-        normal_deviations = np.abs(rng.normal(loc=0, scale=4, size=(n_samples, 1)))
-        
-        # Normal relative deviations: 0% to 0.1%
-        rel_deviations = normal_deviations / (normal_amounts + 1.0)
-        
-        # Normal date drift: 0 to 1 day
-        date_drifts = rng.exponential(scale=0.35, size=(n_samples, 1))
-        date_drifts = np.clip(date_drifts, 0, 1.2)
-        
-        self.X_train = np.hstack([log_amounts, normal_deviations, rel_deviations, date_drifts])
-        
-        # Compute baseline mean centroid and covariance matrix for Robust Mahalanobis Outlier Scoring
+    def _fit_matrix(self, X: np.ndarray, mode: str, sample_count: int):
+        self.X_train = X
         self.mean_centroid = np.mean(self.X_train, axis=0)
         cov = np.cov(self.X_train, rowvar=False)
-        # Regularize covariance matrix to ensure stable inversion
         cov_reg = cov + np.eye(cov.shape[0]) * 1e-4
         self.inv_cov = np.linalg.pinv(cov_reg)
-        
         self.clf = IsolationForest(
             n_estimators=120,
             contamination=0.05,
@@ -45,6 +32,41 @@ class AnomalyDetectorService:
             random_state=42
         )
         self.clf.fit(self.X_train)
+        self.calibration_mode = mode
+        self.calibrated_sample_count = sample_count
+
+    def _init_baseline_model(self):
+        # Baseline training data: standard lending repayments
+        # Features: [log1p(amount_inr), deviation_inr, relative_deviation, date_drift_days]
+        rng = np.random.RandomState(42)
+        n_samples = 500
+        normal_amounts = np.clip(rng.normal(loc=18000, scale=6000, size=(n_samples, 1)), 1000, 100000)
+        log_amounts = np.log1p(normal_amounts)
+        normal_deviations = np.abs(rng.normal(loc=0, scale=4, size=(n_samples, 1)))
+        rel_deviations = normal_deviations / (normal_amounts + 1.0)
+        date_drifts = np.clip(rng.exponential(scale=0.35, size=(n_samples, 1)), 0, 1.2)
+        baseline = np.hstack([log_amounts, normal_deviations, rel_deviations, date_drifts])
+        self._fit_matrix(baseline, "synthetic-baseline", n_samples)
+
+    def calibrate(self, samples: List[Dict[str, Any]]) -> Tuple[int, str, str]:
+        rows = []
+        for s in samples:
+            amt = max(float(s.get("amount", 0.0)), 0.0)
+            curr = str(s.get("currency", "INR") or "INR").strip().upper()
+            fx = FX_TO_INR.get(curr, 1.0)
+            amt_inr = amt * fx
+            dev_inr = abs(float(s.get("deviation", 0.0))) * fx
+            drift = abs(float(s.get("dateDifferenceDays", 0.0)))
+            rel = dev_inr / (amt_inr + 1.0) if amt_inr > 0 else 0.0
+            rows.append([np.log1p(amt_inr), dev_inr, rel, drift])
+
+        if len(rows) < 10:
+            self._init_baseline_model()
+            return self.calibrated_sample_count, self.model_version, self.calibration_mode
+
+        X_live = np.array(rows, dtype=float)
+        self._fit_matrix(X_live, "live-portfolio-fitted", len(rows))
+        return self.calibrated_sample_count, self.model_version, self.calibration_mode
 
     def analyze(self, evidence: TransactionEvidence, feature_context: Dict[str, Any] | None) -> Tuple[float, str, List[str], str, str, List[Dict[str, Any]], Dict[str, float]]:
         signals = []
@@ -76,19 +98,24 @@ class AnomalyDetectorService:
 
             unmatched_side = feature_context.get("unmatchedSide")
 
-        base_amt = expected if expected > 0 else amt
-        rel_ratio = deviation / (base_amt + 1.0) if base_amt > 0 else (1.0 if deviation > 0 else 0.0)
         curr = (evidence.currency or "INR").strip().upper()
+        fx = FX_TO_INR.get(curr, 1.0)
+        amt_inr = amt * fx
+        expected_inr = expected * fx
+        deviation_inr = deviation * fx
 
-        # Multi-signal extraction (single-sided unmatched records naturally have ~100% rel_ratio, so gate ratio thresholds on dual-sided comparisons)
-        if deviation >= 5000 or (not unmatched_side and rel_ratio >= 0.20):
+        base_amt = expected_inr if expected_inr > 0 else amt_inr
+        rel_ratio = deviation_inr / (base_amt + 1.0) if base_amt > 0 else (1.0 if deviation_inr > 0 else 0.0)
+
+        # Multi-signal extraction (FX-normalized to INR-equivalent exposure; single-sided unmatched records naturally have ~100% rel_ratio)
+        if deviation_inr >= 5000 or (not unmatched_side and rel_ratio >= 0.20):
             signals.append("CRITICAL_AMOUNT_DEVIATION")
-        elif deviation >= 500 or (not unmatched_side and rel_ratio >= 0.05):
+        elif deviation_inr >= 500 or (not unmatched_side and rel_ratio >= 0.05):
             signals.append("MODERATE_AMOUNT_DEVIATION")
-        elif deviation > 0:
+        elif deviation_inr > 0:
             signals.append("MINOR_VARIANCE_TOLERANCE")
 
-        if amt >= 100000 or expected >= 100000:
+        if amt_inr >= 100000 or expected_inr >= 100000:
             signals.append("HIGH_VALUE_EXPOSURE")
 
         if date_drift >= 3.0:
@@ -102,8 +129,8 @@ class AnomalyDetectorService:
         if amt <= 0 and expected <= 0:
             signals.append("ZERO_OR_NEGATIVE_VALUATION")
 
-        # Feature vector [log1p(amount), deviation, rel_ratio, date_drift]
-        sample = np.array([np.log1p(max(amt, 0.0)), deviation, rel_ratio, date_drift])
+        # Feature vector [log1p(amount_inr), deviation_inr, rel_ratio, date_drift]
+        sample = np.array([np.log1p(max(amt_inr, 0.0)), deviation_inr, rel_ratio, date_drift])
         sample_2d = sample.reshape(1, -1)
         
         # 1. Isolation Forest Outlier Score (Range [-0.5, 0.5])
@@ -118,23 +145,23 @@ class AnomalyDetectorService:
         # 3. Tri-Model Ensemble (iForest 55% + Mahalanobis 45%)
         ensemble_score = (0.55 * iforest_norm) + (0.45 * mahal_norm)
 
-        # Calibrated domain floors scaled cleanly to exposure severity
+        # Calibrated domain floors scaled cleanly to INR-equivalent exposure severity
         if "CRITICAL_AMOUNT_DEVIATION" in signals:
-            ensemble_score = max(ensemble_score, 0.85 if deviation >= 10000 or (not unmatched_side and rel_ratio >= 0.20) else 0.76)
+            ensemble_score = max(ensemble_score, 0.85 if deviation_inr >= 10000 or (not unmatched_side and rel_ratio >= 0.20) else 0.76)
         if "COUNTERPARTY_RECONCILIATION_GAP" in signals:
-            if deviation >= 15000:
+            if deviation_inr >= 15000:
                 ensemble_score = max(ensemble_score, 0.82)
-            elif deviation >= 5000:
+            elif deviation_inr >= 5000:
                 ensemble_score = max(ensemble_score, 0.72)
-            elif deviation >= 1000:
+            elif deviation_inr >= 1000:
                 ensemble_score = max(ensemble_score, 0.56)
             else:
                 ensemble_score = min(max(ensemble_score, 0.42), 0.58)
-        if "HIGH_VALUE_EXPOSURE" in signals and deviation > 0:
+        if "HIGH_VALUE_EXPOSURE" in signals and deviation_inr > 0:
             ensemble_score = max(ensemble_score, 0.88)
         if "TEMPORAL_DRIFT_OUTLIER" in signals:
             ensemble_score = max(ensemble_score, 0.68)
-        if deviation == 0 and date_drift <= 0.5 and not unmatched_side:
+        if deviation_inr == 0 and date_drift <= 0.5 and not unmatched_side:
             ensemble_score = min(ensemble_score, 0.15)
 
         anomaly_score = round(float(np.clip(ensemble_score, 0.05, 0.98)), 2)

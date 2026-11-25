@@ -122,14 +122,16 @@ test.describe('LENDGUARD AI — Enterprise Max-Roof Capabilities E2E Verificatio
     expect(journalRes.status()).toBe(200);
     await expect(page.getByText(/POSTED: JE-LG-/i)).toBeVisible({ timeout: 5000 });
 
-    // Trigger AI Diagnostics if available
+    // Trigger AI Diagnostics and wait for live Dual-Engine response
     const runAiBtn = page.getByRole('button', { name: /Full AI Diagnostics/i }).first();
     if (await runAiBtn.isVisible()) {
+      const aiPromise = page.waitForResponse((res) => res.url().includes('/analysis') && res.request().method() === 'POST', { timeout: 20000 });
       await runAiBtn.click();
-      await page.waitForTimeout(2500);
+      const aiRes = await aiPromise;
+      expect([200, 201, 202]).toContain(aiRes.status());
     }
 
-    await expect(page.getByText(/Engine 1: IsolationForest/i).or(page.getByText(/Anomaly Outlier/i)).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Engine 1: ML Anomaly Detector/i).or(page.getByText(/Calculated Anomaly Score/i)).first()).toBeVisible({ timeout: 15000 });
     expect(errors).toEqual([]);
   });
 

@@ -34,17 +34,20 @@ public class SystemController : ApiControllerBase
     private readonly LendGuardDbContext _context;
     private readonly IAuditService _auditService;
     private readonly INotificationService _notificationService;
+    private readonly IAiClientService _aiClient;
     private readonly ILogger<SystemController> _logger;
 
     public SystemController(
         LendGuardDbContext context,
         IAuditService auditService,
         INotificationService notificationService,
+        IAiClientService aiClient,
         ILogger<SystemController> logger)
     {
         _context = context;
         _auditService = auditService;
         _notificationService = notificationService;
+        _aiClient = aiClient;
         _logger = logger;
     }
 
@@ -164,6 +167,8 @@ public class SystemController : ApiControllerBase
         _logger.LogInformation("Admin requested full mathematically consistent showcase demonstration reset.");
 
         var summary = await DatabaseSeeder.ResetShowcaseDatasetAsync(_context, _logger, CurrentUserId, cancellationToken);
+        var portfolioTxns = await _context.Transactions.AsNoTracking().ToListAsync(cancellationToken);
+        var aiCalibrated = await _aiClient.CalibrateModelAsync(portfolioTxns, cancellationToken);
 
         await _auditService.LogAsync("SHOWCASE_DATA_RESET", "SYSTEM", Guid.Empty, CurrentUserId, new
         {
@@ -172,7 +177,8 @@ public class SystemController : ApiControllerBase
             totalExceptions = summary.TotalExceptions,
             assignedToAnu = summary.AssignedToAnu,
             assignedToOperationalAnalyst = summary.AssignedToOperationalAnalyst,
-            unassignedOutliers = summary.UnassignedOpen
+            unassignedOutliers = summary.UnassignedOpen,
+            aiCalibrated
         }, null, cancellationToken);
 
         await _notificationService.BroadcastEventAsync("SYSTEM_RESEEDED", "Showcase State Reset", "Platform dataset rebuilt to mathematically verified demonstration benchmark.", null, cancellationToken);
@@ -188,7 +194,17 @@ public class SystemController : ApiControllerBase
             resolvedExceptions = summary.ResolvedExceptions,
             assignedToAnu = summary.AssignedToAnu,
             assignedToOperationalAnalyst = summary.AssignedToOperationalAnalyst,
-            unassignedOutliers = summary.UnassignedOpen
+            unassignedOutliers = summary.UnassignedOpen,
+            aiCalibrated
         });
+    }
+
+    [HttpPost("ai-calibrate")]
+    [Authorize(Roles = UserRole.Admin)]
+    public async Task<IActionResult> CalibrateAiModel(CancellationToken cancellationToken)
+    {
+        var txns = await _context.Transactions.AsNoTracking().ToListAsync(cancellationToken);
+        var calibrated = await _aiClient.CalibrateModelAsync(txns, cancellationToken);
+        return Ok(new { success = calibrated, sampleCount = txns.Count, calibrationMode = calibrated ? "live-portfolio-fitted" : "baseline-fallback" });
     }
 }

@@ -28,3 +28,14 @@ class ExceptionExplanationRequest(BaseModel):
     analysisId: str
     exceptionType: str
     evidence: ExplanationEvidence
+
+
+class CalibrationSample(BaseModel):
+    amount: float
+    currency: str = "INR"
+    deviation: float = 0.0
+    dateDifferenceDays: float = 0.0
+
+
+class CalibrateModelRequest(BaseModel):
+    samples: list[CalibrationSample]

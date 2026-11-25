@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -206,5 +208,38 @@ public class AiClientService : IAiClientService
             ModelName = "evidence-explainer-v1",
             CreatedAt = DateTimeOffset.UtcNow
         };
+    }
+
+    public async Task<bool> CalibrateModelAsync(IEnumerable<Transaction> transactions, CancellationToken cancellationToken = default)
+    {
+        var samples = transactions.Select(t => new
+        {
+            amount = (double)t.Amount,
+            currency = string.IsNullOrWhiteSpace(t.Currency) ? "INR" : t.Currency.Trim().ToUpperInvariant(),
+            deviation = 0.0,
+            dateDifferenceDays = 0.0
+        }).ToList();
+
+        if (samples.Count == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/internal/v1/calibrate")
+            {
+                Content = JsonContent.Create(new { samples })
+            };
+            request.Headers.Add("X-Service-Key", _serviceKey);
+
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to calibrate AI anomaly model against live portfolio.");
+            return false;
+        }
     }
 }

@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-11-24T05:38:04Z",
+  "reconciliationRunId": "7513190f-960e-42c8-945c-68c3b6dc86b8",
+  "internalBatchId": "6bc64d76-984c-4cd6-9a60-f2851e9e96bb",
+  "externalBatchId": "ff7c329f-5569-4450-8676-72a569b9b18c",
+  "matchedCount": 3,
+  "exceptionCount": 11,
+  "allRulesPassed": true,
+  "rules": [
+    {
+      "ruleId": "RC-01 / RC-02",
+      "ruleName": "Exact Candidate Identification & Exact Amount Match",
+      "expectedOutcome": "EXACT",
+      "actualCount": 2,
+      "status": "PASSED",
+      "details": "Found 2 EXACT match with 100% confidence within date tolerance."
+    },
+    {
+      "ruleId": "RC-03",
+      "ruleName": "Amount Mismatch Detection",
+      "expectedOutcome": "AMOUNT_MISMATCH",
+      "actualCount": 1,
+      "status": "PASSED",
+      "details": "Found AMOUNT_MISMATCH with discrepancy 500.00."
+    },
+    {
+      "ruleId": "RC-04",
+      "ruleName": "Missing External Settlement Detection",
+      "expectedOutcome": "MISSING_SETTLEMENT",
+      "actualCount": 3,
+      "status": "PASSED",
+      "details": "Detected 3 missing external settlements."
+    },
+    {
+      "ruleId": "RC-05",
+      "ruleName": "Unmatched External Settlement Detection",
+      "expectedOutcome": "UNMATCHED_EXTERNAL",
+      "actualCount": 2,
+      "status": "PASSED",
+      "details": "Detected 2 unmatched external records."
+    },
+    {
+      "ruleId": "RC-06",
+      "ruleName": "Duplicate Settlement Detection",
+      "expectedOutcome": "DUPLICATE",
+      "actualCount": 2,
+      "status": "PASSED",
+      "details": "Identified 2 duplicate settlements claiming identical amounts."
+    },
+    {
+      "ruleId": "RC-07 (Aggregate)",
+      "ruleName": "Partial Settlement Aggregation Matching",
+      "expectedOutcome": "AGGREGATE",
+      "actualCount": 1,
+      "status": "PASSED",
+      "details": "Successfully aggregated multi-part settlements into 1 match (Sum = 30000.00)."
+    },
+    {
+      "ruleId": "RC-07 (Partial)",
+      "ruleName": "Partial Settlement Discrepancy",
+      "expectedOutcome": "PARTIAL_SETTLEMENT",
+      "actualCount": 1,
+      "status": "PASSED",
+      "details": "Flagged partial settlement with discrepancy 15000.00."
+    },
+    {
+      "ruleId": "RC-08",
+      "ruleName": "Ambiguous Match Detection (Tolerance & Over-settlement)",
+      "expectedOutcome": "AMBIGUOUS_MATCH",
+      "actualCount": 2,
+      "status": "PASSED",
+      "details": "Flagged 2 ambiguous cases (>2-day date difference and sum > expected)."
+    },
+    {
+      "ruleId": "EDGE-CURRENCY",
+      "ruleName": "Strict Currency Isolation (USD != EUR)",
+      "expectedOutcome": "NO_MATCH",
+      "actualCount": 0,
+      "status": "PASSED",
+      "details": "Verified that currency mismatch prevents accidental match."
+    },
+    {
+      "ruleId": "EDGE-DOUBLE-CONSUME",
+      "ruleName": "Double Consumption Prevention",
+      "expectedOutcome": "CONSUMED_ONCE",
+      "actualCount": 1,
+      "status": "PASSED",
+      "details": "Verified that an external settlement cannot be consumed by multiple internal transactions."
+    },
+    {
+      "ruleId": "EDGE-IDEMPOTENCY",
+      "ruleName": "Reconciliation Run Idempotency",
+      "expectedOutcome": "REJECT_OR_IDEMPOTENT",
+      "actualCount": 1,
+      "status": "PASSED",
+      "details": "Attempt to rerun batch returned status 409: {\"Success\":false,\"Error\":{\"Code\":\"CONFLICT\",\"Message\":\"A reconciliation run has already been complet"
+    }
+  ]
+}

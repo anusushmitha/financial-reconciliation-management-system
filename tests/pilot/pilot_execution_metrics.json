@@ -1,0 +1,37 @@
+{
+  "execution_timestamp": "2026-11-19T10:45:59.239612Z",
+  "scenarios_executed": 14,
+  "scenarios_passed": 14,
+  "scenarios_failed": 0,
+  "total_transactions_imported": 25,
+  "matched_transactions": 3,
+  "unmatched_transactions": 11,
+  "exceptions_by_category": {
+    "UNMATCHED_EXTERNAL": 10,
+    "MISSING_SETTLEMENT": 15,
+    "AMBIGUOUS_MATCH": 10,
+    "PARTIAL_SETTLEMENT": 5,
+    "DUPLICATE": 10,
+    "AMOUNT_MISMATCH": 5
+  },
+  "ground_truth_accuracy": 100.0,
+  "reconciliation_processing_ms": 3022,
+  "ai_advisory_status": "ACTIVE_AND_ACCURATE",
+  "audit_logs_recorded": 50,
+  "scenario_results": {
+    "SCENARIO-01_Exact_Match": "PASS",
+    "SCENARIO-02_Partial_Aggregate_Settlement": "PASS",
+    "SCENARIO-03_Missing_Settlements": "PASS",
+    "SCENARIO-04_Duplicate_Transactions": "PASS",
+    "SCENARIO-05_Amount_Mismatch": "PASS",
+    "SCENARIO-06_Ambiguous_Matches": "PASS",
+    "SCENARIO-07_Invalid_CSV_Import": "PASS",
+    "SCENARIO-08_Duplicate_Batch_Import": "PASS",
+    "SCENARIO-09_Analyst_Assignment_Reassignment": "PASS",
+    "SCENARIO-10_Notes_And_Human_Resolution": "PASS",
+    "SCENARIO-11_AI_Advisory_Boundary": "PASS",
+    "SCENARIO-12_Audit_And_Reporting_Export": "PASS",
+    "SCENARIO-13_Unauthorized_Access_Prevention": "PASS",
+    "SCENARIO-14_Worker_Outbox_And_Recovery": "PASS"
+  }
+}

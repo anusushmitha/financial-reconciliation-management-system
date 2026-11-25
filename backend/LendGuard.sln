@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LendGuard.Domain", "LendGuard.Domain\LendGuard.Domain.csproj", "{48F10811-4101-4CF7-998D-922D3B2C78DE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LendGuard.Application", "LendGuard.Application\LendGuard.Application.csproj", "{7BE9FC56-642D-4DD2-A5AA-A0F94BC18357}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LendGuard.Infrastructure", "LendGuard.Infrastructure\LendGuard.Infrastructure.csproj", "{76EAFC97-8072-4AD0-9A4A-CA88BFB83B58}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LendGuard.Api", "LendGuard.Api\LendGuard.Api.csproj", "{CB9145E2-DAFB-496F-862F-F98AF2F06132}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LendGuard.Worker", "LendGuard.Worker\LendGuard.Worker.csproj", "{AE562F4B-B1A7-42E0-A0AC-F199355DC516}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LendGuard.Tests", "LendGuard.Tests\LendGuard.Tests.csproj", "{25484C57-9D22-414D-B8C5-12B6CF42B38D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{48F10811-4101-4CF7-998D-922D3B2C78DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48F10811-4101-4CF7-998D-922D3B2C78DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48F10811-4101-4CF7-998D-922D3B2C78DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48F10811-4101-4CF7-998D-922D3B2C78DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7BE9FC56-642D-4DD2-A5AA-A0F94BC18357}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BE9FC56-642D-4DD2-A5AA-A0F94BC18357}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BE9FC56-642D-4DD2-A5AA-A0F94BC18357}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BE9FC56-642D-4DD2-A5AA-A0F94BC18357}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76EAFC97-8072-4AD0-9A4A-CA88BFB83B58}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76EAFC97-8072-4AD0-9A4A-CA88BFB83B58}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76EAFC97-8072-4AD0-9A4A-CA88BFB83B58}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76EAFC97-8072-4AD0-9A4A-CA88BFB83B58}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CB9145E2-DAFB-496F-862F-F98AF2F06132}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CB9145E2-DAFB-496F-862F-F98AF2F06132}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CB9145E2-DAFB-496F-862F-F98AF2F06132}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CB9145E2-DAFB-496F-862F-F98AF2F06132}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE562F4B-B1A7-42E0-A0AC-F199355DC516}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE562F4B-B1A7-42E0-A0AC-F199355DC516}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE562F4B-B1A7-42E0-A0AC-F199355DC516}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE562F4B-B1A7-42E0-A0AC-F199355DC516}.Release|Any CPU.Build.0 = Release|Any CPU
+		{25484C57-9D22-414D-B8C5-12B6CF42B38D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{25484C57-9D22-414D-B8C5-12B6CF42B38D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{25484C57-9D22-414D-B8C5-12B6CF42B38D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{25484C57-9D22-414D-B8C5-12B6CF42B38D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -4,74 +4,98 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: lendguard-postgres
+    restart: always
     environment:
-      POSTGRES_USER: lendguard
-      POSTGRES_PASSWORD: lendguardpwd
-      POSTGRES_DB: lendguarddb
+      POSTGRES_DB: lendguard
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: lendguard_password
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lendguard -d lendguarddb"]
+      test: ["CMD-SHELL", "pg_isready -U app -d lendguard"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: lendguard-api
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      ConnectionStrings__DefaultConnection: "Host=postgres;Database=lendguarddb;Username=lendguard;Password=lendguardpwd"
-      ASPNETCORE_URLS: "http://+:80"
-      ASPNETCORE_ENVIRONMENT: "Development"
-      AIService__BaseUrl: "http://ai:8000"
-    ports:
-      - "5000:80"
-    restart: unless-stopped
-
-  worker:
-    build:
-      context: .
-      dockerfile: worker/Dockerfile
-    container_name: lendguard-worker
-    depends_on:
-      postgres:
-        condition: service_healthy
-      api:
-        condition: service_started
-    environment:
-      ConnectionStrings__DefaultConnection: "Host=postgres;Database=lendguarddb;Username=lendguard;Password=lendguardpwd"
-      AIService__BaseUrl: "http://ai:8000"
-    restart: unless-stopped
-
-  ai:
+  ai-service:
     build:
       context: ./ai-service
       dockerfile: Dockerfile
-    container_name: lendguard-ai
+    container_name: lendguard-ai-service
+    restart: always
+    environment:
+      PORT: 8000
+      AI_SERVICE_KEY: lendguard_internal_ai_secret_key_2026
+      LLM_PROVIDER: mock
+      LLM_API_KEY: test_key
+      LLM_MODEL: gpt-4o-mini
     ports:
       - "8000:8000"
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/internal/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend-api:
+    build:
+      context: .
+      dockerfile: backend/LendGuard.Api/Dockerfile
+    container_name: lendguard-api
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=lendguard;Username=app;Password=lendguard_password
+      JWT_SECRET: LendGuard_Super_Secret_Key_For_Jwt_Authentication_Must_Be_Long_2026
+      JWT_EXPIRY_MINUTES: 480
+      FILE_STORAGE_PATH: /app/storage
+      AI_SERVICE_BASE_URL: http://ai-service:8000
+      AI_SERVICE_KEY: lendguard_internal_ai_secret_key_2026
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    volumes:
+      - app_storage:/app/storage
+
+  backend-worker:
+    build:
+      context: .
+      dockerfile: backend/LendGuard.Worker/Dockerfile
+    container_name: lendguard-worker
+    restart: always
+    environment:
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=lendguard;Username=app;Password=lendguard_password
+      FILE_STORAGE_PATH: /app/storage
+      AI_SERVICE_BASE_URL: http://ai-service:8000
+      AI_SERVICE_KEY: lendguard_internal_ai_secret_key_2026
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend-api:
+        condition: service_started
+    volumes:
+      - app_storage:/app/storage
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: lendguard-frontend
-    depends_on:
-      - api
-      - ai
+    restart: always
+    environment:
+      VITE_API_BASE_URL: http://localhost:5000/api/v1
     ports:
-      - "80:80"
-      - "3000:80"
-    restart: unless-stopped
+      - "5173:80"
+    depends_on:
+      - backend-api
 
 volumes:
-  pgdata:
+  postgres_data:
+  app_storage:

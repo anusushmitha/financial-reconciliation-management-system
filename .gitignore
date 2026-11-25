@@ -1,17 +1,49 @@
-# Build & Dependency Artifacts
+# Binaries and build artifacts
 bin/
 obj/
-node_modules/
-build/
 dist/
-__pycache__/
-*.pyc
+node_modules/
+.tmp/
 
-# Local Environment & Secrets
-.dotnet_home/
+# Python Virtual Environments & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.pytest_cache/
+
+# Databases & local data
+database/data/
+database/backups/*.zip
+database/backups/*.sql
+storage/batches/
+storage/uploads/
+storage/exports/
+storage_drill_restored/
+storage_clean_staging/
+storage_clean_recovery/
+backups_clean_staging/
+
+# Test Reports
+test-results/
+playwright-report/
+
+# Environment and secrets
 .env
 *.local
+*.user
 
-# Logs & Database volumes
-*.log
+# IDE and OS
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+.env.staging
+storage_staging/
+storage_staging_recovered/
+backend/LendGuard.Api/storage/
+logs/
 pgdata/
+*.log

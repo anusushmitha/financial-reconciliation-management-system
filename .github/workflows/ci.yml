@@ -1,0 +1,87 @@
+name: LendGuard AI — Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, release/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-validation:
+    name: Backend Build, Test & Security Scan (.NET)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore NuGet Packages
+        run: dotnet restore backend/LendGuard.sln
+
+      - name: Build Solution
+        run: dotnet build backend/LendGuard.sln --no-restore -c Release
+
+      - name: Run Unit & Integration Tests
+        run: dotnet test backend/LendGuard.Tests/LendGuard.Tests.csproj --no-build -c Release --verbosity normal
+
+      - name: Vulnerability Scan (NuGet)
+        run: dotnet list backend/LendGuard.sln package --vulnerable --include-transitive
+
+  frontend-validation:
+    name: Frontend Lint, Build & Test (React + TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: cd frontend && npm ci
+
+      - name: Type Check & Production Build
+        run: cd frontend && npm run build
+
+      - name: Dependency Security Audit
+        run: cd frontend && npm audit --audit-level=high
+
+  ai-service-validation:
+    name: Python AI Advisory Service Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          cd ai-service
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run AI Fallback & Anomaly Tests
+        run: |
+          cd tests/ai
+          python test_ai_boundary_and_fallback.py
+
+  governance-gate:
+    name: Go-Live Quality Gates & Traceability
+    needs: [backend-validation, frontend-validation, ai-service-validation]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Quality Gate Completion
+        run: echo "All automated CI gates passed successfully. Artifact ready for staging deployment."

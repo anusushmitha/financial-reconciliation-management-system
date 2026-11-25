@@ -57,7 +57,7 @@ def explain_exception(
     summary, refs, rec, model_used, elapsed_ms = llm_explainer_service.explain(
         request.exceptionType, request.evidence
     )
-    provider = "nvidia" if ("nvidia" in model_used or "minimax" in model_used) else "internal"
+    provider = "nvidia" if ("nvidia" in model_used or "minimax" in model_used) else "offline"
     return ExceptionExplanationResponse(
         status="COMPLETED",
         summary=summary,

@@ -170,6 +170,51 @@ public class SystemController : ApiControllerBase
         var portfolioTxns = await _context.Transactions.AsNoTracking().ToListAsync(cancellationToken);
         var aiCalibrated = await _aiClient.CalibrateModelAsync(portfolioTxns, cancellationToken);
 
+        // Hydrate flagship active exceptions with live ML + NVIDIA Nemotron AI explanations
+        var flagshipExceptions = await _context.Exceptions
+            .Include(e => e.InternalTransaction)
+            .Include(e => e.ExternalTransaction)
+            .Where(e => e.Status != ExceptionStatus.Resolved)
+            .OrderByDescending(e => e.DiscrepancyAmount)
+            .Take(5)
+            .ToListAsync(cancellationToken);
+
+        var liveAiTasks = flagshipExceptions.Select(async ex =>
+        {
+            var anomaly = await _aiClient.AnalyzeAnomalyAsync(ex, ex.InternalTransaction ?? ex.ExternalTransaction, cancellationToken);
+            var explain = await _aiClient.ExplainExceptionAsync(ex, ex.InternalTransaction, ex.ExternalTransaction, cancellationToken);
+            return (ex, anomaly, explain);
+        });
+        var liveAiResults = await Task.WhenAll(liveAiTasks);
+        foreach (var (ex, anomaly, explain) in liveAiResults)
+        {
+            _context.AiAnalyses.Add(new AiAnalysis
+            {
+                Id = anomaly.AnalysisId,
+                ExceptionId = ex.Id,
+                AnalysisType = AiAnalysisType.Anomaly,
+                ModelName = anomaly.ModelName,
+                ModelVersion = "3.0",
+                Result = System.Text.Json.JsonSerializer.Serialize(new { summary = anomaly.Summary, evidence = anomaly.Evidence, recommendation = anomaly.Recommendation, advisoryOnly = true }),
+                Status = anomaly.Status,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CompletedAt = DateTimeOffset.UtcNow
+            });
+            _context.AiAnalyses.Add(new AiAnalysis
+            {
+                Id = explain.AnalysisId,
+                ExceptionId = ex.Id,
+                AnalysisType = AiAnalysisType.Explanation,
+                ModelName = explain.ModelName,
+                ModelVersion = "1.0",
+                Result = System.Text.Json.JsonSerializer.Serialize(new { summary = explain.Summary, evidence = explain.Evidence, recommendation = explain.Recommendation, advisoryOnly = true }),
+                Status = explain.Status,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CompletedAt = DateTimeOffset.UtcNow
+            });
+        }
+        await _context.SaveChangesAsync(cancellationToken);
+
         await _auditService.LogAsync("SHOWCASE_DATA_RESET", "SYSTEM", Guid.Empty, CurrentUserId, new
         {
             totalTransactions = summary.TotalTransactions,

@@ -139,4 +139,6 @@ def test_calibrate_endpoint_fits_live_portfolio():
     data = res.json()
     assert data["status"] == "CALIBRATED"
     assert data["sampleCount"] == 15
-    assert data["calibrationMode"] == "live-portfolio-fitted"
+    assert data["calibrationMode"] == "live-portfolio-blended"
+    from app.services.anomaly_detector import anomaly_detector_service
+    assert anomaly_detector_service.validation_roc_auc >= 0.90

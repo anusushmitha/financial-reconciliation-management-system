@@ -673,7 +673,13 @@ export const ExceptionDetailPage: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       {/* Live Provenance Badge */}
                       {(() => {
-                        const isLiveAi = Boolean(explanationAnalysis.modelName && !explanationAnalysis.modelName.includes('rule-engine') && !explanationAnalysis.modelName.includes('heuristic'));
+                        const isLiveAi = Boolean(
+                          explanationAnalysis.modelName &&
+                          !explanationAnalysis.modelName.includes('ai-offline') &&
+                          !explanationAnalysis.modelName.includes('rule-engine') &&
+                          !explanationAnalysis.modelName.includes('heuristic') &&
+                          !explanationAnalysis.modelName.includes('evidence-explainer')
+                        );
                         return (
                           <div style={{
                             display: 'flex',
@@ -682,8 +688,8 @@ export const ExceptionDetailPage: React.FC = () => {
                             flexWrap: 'wrap',
                             gap: '6px',
                             padding: '8px 12px',
-                            backgroundColor: isLiveAi ? '#F0FDF4' : '#F8FAFC',
-                            border: isLiveAi ? '1px solid #BBF7D0' : '1px solid #E2E8F0',
+                            backgroundColor: isLiveAi ? '#F0FDF4' : '#FFFBEB',
+                            border: isLiveAi ? '1px solid #BBF7D0' : '1px solid #FDE68A',
                             borderRadius: '6px'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -691,27 +697,27 @@ export const ExceptionDetailPage: React.FC = () => {
                                 width: '8px',
                                 height: '8px',
                                 borderRadius: '50%',
-                                backgroundColor: isLiveAi ? '#16A34A' : '#64748B',
+                                backgroundColor: isLiveAi ? '#16A34A' : '#D97706',
                                 display: 'inline-block',
                                 boxShadow: isLiveAi ? '0 0 6px rgba(22, 163, 74, 0.7)' : 'none'
                               }} />
-                              <span style={{ fontSize: '11px', fontWeight: 700, color: isLiveAi ? '#166534' : '#475569' }}>
-                                <ShinyText text={isLiveAi ? 'VERIFIED LIVE AI MODEL' : 'INTERNAL RULE ENGINE'} speed={2.5} />
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: isLiveAi ? '#166534' : '#92400E' }}>
+                                <ShinyText text={isLiveAi ? 'VERIFIED LIVE NVIDIA AI' : 'AI OFFLINE • STANDARD REFERENCE'} speed={2.5} />
                               </span>
                               <span style={{
                                 fontSize: '11px',
                                 fontFamily: 'monospace',
                                 fontWeight: 600,
                                 padding: '1px 6px',
-                                backgroundColor: isLiveAi ? '#DCFCE7' : '#E2E8F0',
-                                color: isLiveAi ? '#15803D' : '#475569',
+                                backgroundColor: isLiveAi ? '#DCFCE7' : '#FEF3C7',
+                                color: isLiveAi ? '#15803D' : '#92400E',
                                 borderRadius: '4px'
                               }}>
                                 {explanationAnalysis.modelName}
                               </span>
                             </div>
                             <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 500 }}>
-                              NVIDIA NIM High-Performance API
+                              {isLiveAi ? 'NVIDIA NIM Live API' : 'Fallback Active Until AI Reconnects'}
                             </span>
                           </div>
                         );

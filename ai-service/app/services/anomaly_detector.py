@@ -1,54 +1,92 @@
 import numpy as np
 from sklearn.ensemble import IsolationForest
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.preprocessing import RobustScaler
+from sklearn.metrics import roc_auc_score
 from typing import Dict, Any, List, Tuple
 from app.schemas.requests import TransactionEvidence
-
-FX_TO_INR = {
-    "INR": 1.0,
-    "USD": 84.0,
-    "EUR": 90.0,
-    "GBP": 106.0,
-}
+from app.data.lending_corpus import FX_TO_INR, build_lending_training_corpus
 
 
 class AnomalyDetectorService:
     def __init__(self):
-        self.model_version = "scikit-learn/isolation-forest-v2.0-enterprise"
-        self.algorithm = "Tri-Model Outlier Ensemble (iForest + Robust Covariance)"
-        self.calibration_mode = "synthetic-baseline"
+        self.model_version = "scikit-learn/tri-ensemble-v3.0-enterprise"
+        self.algorithm = "Scaled Tri-Model Outlier Ensemble (iForest + LOF + Robust Mahalanobis)"
+        self.calibration_mode = "multi-regime-lending-corpus"
         self.calibrated_sample_count = 0
+        self.validation_roc_auc = 0.0
         self._init_baseline_model()
+
+    def _build_feature_row(self, amt_inr: float, dev_inr: float, rel: float, drift: float, is_single: float, is_cross: float) -> np.ndarray:
+        z_dev = float(np.clip((dev_inr - self.dev_median) / max(self.dev_iqr, 1.0), 0.0, 20.0))
+        return np.array([
+            np.log1p(max(amt_inr, 0.0)),
+            np.log1p(max(dev_inr, 0.0)),
+            rel,
+            drift,
+            is_single,
+            is_cross,
+            z_dev,
+        ], dtype=float)
 
     def _fit_matrix(self, X: np.ndarray, mode: str, sample_count: int):
         self.X_train = X
-        self.mean_centroid = np.mean(self.X_train, axis=0)
-        cov = np.cov(self.X_train, rowvar=False)
-        cov_reg = cov + np.eye(cov.shape[0]) * 1e-4
+        self.scaler = RobustScaler()
+        self.X_scaled = self.scaler.fit_transform(self.X_train)
+
+        self.mean_centroid = np.mean(self.X_scaled, axis=0)
+        cov = np.cov(self.X_scaled, rowvar=False)
+        cov_reg = cov + np.eye(cov.shape[0]) * 1e-3
         self.inv_cov = np.linalg.pinv(cov_reg)
+
         self.clf = IsolationForest(
-            n_estimators=120,
+            n_estimators=160,
             contamination=0.05,
             max_samples="auto",
-            random_state=42
+            random_state=42,
         )
-        self.clf.fit(self.X_train)
+        self.clf.fit(self.X_scaled)
+
+        self.lof = LocalOutlierFactor(
+            n_neighbors=min(25, max(5, len(self.X_scaled) // 4)),
+            contamination=0.05,
+            novelty=True,
+        )
+        self.lof.fit(self.X_scaled)
+
         self.calibration_mode = mode
         self.calibrated_sample_count = sample_count
 
+    def _raw_ensemble_score(self, sample_2d: np.ndarray) -> Tuple[float, float, float]:
+        scaled = self.scaler.transform(sample_2d)
+        raw_iforest = float(self.clf.decision_function(scaled)[0])
+        iforest_norm = float(np.clip(0.50 - (raw_iforest * 1.15), 0.05, 0.98))
+
+        raw_lof = float(self.lof.decision_function(scaled)[0])
+        lof_norm = float(np.clip(0.50 - (raw_lof * 0.35), 0.05, 0.98))
+
+        diff = scaled - self.mean_centroid
+        mahal_sq = float(np.dot(np.dot(diff, self.inv_cov), diff.T).item())
+        mahal_dist = float(np.sqrt(max(mahal_sq, 0.0)))
+        mahal_norm = float(np.clip(mahal_dist / 6.5, 0.05, 0.98))
+
+        ensemble = (0.45 * iforest_norm) + (0.30 * lof_norm) + (0.25 * mahal_norm)
+        return ensemble, iforest_norm, mahal_norm
+
     def _init_baseline_model(self):
-        # Baseline training data: standard lending repayments
-        # Features: [log1p(amount_inr), deviation_inr, relative_deviation, date_drift_days]
-        rng = np.random.RandomState(42)
-        n_samples = 500
-        normal_amounts = np.clip(rng.normal(loc=18000, scale=6000, size=(n_samples, 1)), 1000, 100000)
-        log_amounts = np.log1p(normal_amounts)
-        normal_deviations = np.abs(rng.normal(loc=0, scale=4, size=(n_samples, 1)))
-        rel_deviations = normal_deviations / (normal_amounts + 1.0)
-        date_drifts = np.clip(rng.exponential(scale=0.35, size=(n_samples, 1)), 0, 1.2)
-        baseline = np.hstack([log_amounts, normal_deviations, rel_deviations, date_drifts])
-        self._fit_matrix(baseline, "synthetic-baseline", n_samples)
+        X_normal, X_val, y_val, dev_med, dev_iqr = build_lending_training_corpus(seed=42)
+        self.dev_median = dev_med
+        self.dev_iqr = dev_iqr
+        self._fit_matrix(X_normal, "multi-regime-lending-corpus", len(X_normal))
+
+        val_scores = [self._raw_ensemble_score(row.reshape(1, -1))[0] for row in X_val]
+        self.validation_roc_auc = round(float(roc_auc_score(y_val, val_scores)), 4)
 
     def calibrate(self, samples: List[Dict[str, Any]]) -> Tuple[int, str, str]:
+        X_corpus, _, _, dev_med, dev_iqr = build_lending_training_corpus(seed=42)
+        self.dev_median = dev_med
+        self.dev_iqr = dev_iqr
+
         rows = []
         for s in samples:
             amt = max(float(s.get("amount", 0.0)), 0.0)
@@ -58,14 +96,17 @@ class AnomalyDetectorService:
             dev_inr = abs(float(s.get("deviation", 0.0))) * fx
             drift = abs(float(s.get("dateDifferenceDays", 0.0)))
             rel = dev_inr / (amt_inr + 1.0) if amt_inr > 0 else 0.0
-            rows.append([np.log1p(amt_inr), dev_inr, rel, drift])
+            is_cross = 1.0 if curr != "INR" else 0.0
+            rows.append(self._build_feature_row(amt_inr, dev_inr, rel, drift, 0.0, is_cross))
 
         if len(rows) < 10:
             self._init_baseline_model()
             return self.calibrated_sample_count, self.model_version, self.calibration_mode
 
         X_live = np.array(rows, dtype=float)
-        self._fit_matrix(X_live, "live-portfolio-fitted", len(rows))
+        # Blend real portfolio rows with stratified corpus anchor so small live portfolios remain well-regularized
+        X_blended = np.vstack([X_corpus[:600], X_live])
+        self._fit_matrix(X_blended, "live-portfolio-blended", len(rows))
         return self.calibrated_sample_count, self.model_version, self.calibration_mode
 
     def analyze(self, evidence: TransactionEvidence, feature_context: Dict[str, Any] | None) -> Tuple[float, str, List[str], str, str, List[Dict[str, Any]], Dict[str, float]]:
@@ -129,21 +170,18 @@ class AnomalyDetectorService:
         if amt <= 0 and expected <= 0:
             signals.append("ZERO_OR_NEGATIVE_VALUATION")
 
-        # Feature vector [log1p(amount_inr), deviation_inr, rel_ratio, date_drift]
-        sample = np.array([np.log1p(max(amt_inr, 0.0)), deviation_inr, rel_ratio, date_drift])
+        # 7-feature FX-normalized vector
+        sample = self._build_feature_row(
+            amt_inr,
+            deviation_inr,
+            rel_ratio,
+            date_drift,
+            1.0 if unmatched_side else 0.0,
+            1.0 if curr != "INR" else 0.0,
+        )
         sample_2d = sample.reshape(1, -1)
-        
-        # 1. Isolation Forest Outlier Score (Range [-0.5, 0.5])
-        raw_iforest = self.clf.decision_function(sample_2d)[0]
-        iforest_norm = float(np.clip(0.50 - (raw_iforest * 1.1), 0.05, 0.98))
 
-        # 2. Robust Mahalanobis Distance Score
-        diff = sample - self.mean_centroid
-        mahal_dist = np.sqrt(np.maximum(np.dot(np.dot(diff, self.inv_cov), diff.T), 0.0))
-        mahal_norm = float(np.clip(mahal_dist / 8.0, 0.05, 0.98))
-
-        # 3. Tri-Model Ensemble (iForest 55% + Mahalanobis 45%)
-        ensemble_score = (0.55 * iforest_norm) + (0.45 * mahal_norm)
+        ensemble_score, _, _ = self._raw_ensemble_score(sample_2d)
 
         # Calibrated domain floors scaled cleanly to INR-equivalent exposure severity
         if "CRITICAL_AMOUNT_DEVIATION" in signals:
@@ -223,8 +261,9 @@ class AnomalyDetectorService:
         ]
 
         ensemble_weights = {
-            "isolationForest": 0.55,
-            "robustMahalanobis": 0.45
+            "isolationForest": 0.45,
+            "localOutlierFactor": 0.30,
+            "robustMahalanobis": 0.25,
         }
 
         return anomaly_score, risk_level, signals, self.algorithm, self.model_version, feature_attributions, ensemble_weights

@@ -29,7 +29,7 @@ public class AiClientService : IAiClientService
 
         var baseUrl = configuration["AI_SERVICE_BASE_URL"] ?? "http://localhost:8000";
         _httpClient.BaseAddress = new Uri(baseUrl);
-        _httpClient.Timeout = TimeSpan.FromSeconds(10);
+        _httpClient.Timeout = TimeSpan.FromSeconds(15);
     }
 
     public async Task<AiAnalysisDto> AnalyzeAnomalyAsync(DiscrepancyException exception, Transaction? evidenceTxn, CancellationToken cancellationToken = default)
@@ -109,7 +109,7 @@ public class AiClientService : IAiClientService
             _logger.LogWarning(ex, "Failed to call AI microservice anomaly detection, falling back to heuristic advisory.");
         }
 
-        // Resilient fallback when AI service is unavailable
+        // Explicit AI-Offline fallback when AI microservice is unreachable
         var fallbackCurrency = effectiveTxn?.Currency ?? "INR";
         var fallbackScore = (exception.DiscrepancyAmount > 5000) ? 0.85 : 0.35;
         var fallbackRisk = fallbackScore >= 0.8 ? "CRITICAL" : "MODERATE";
@@ -118,18 +118,19 @@ public class AiClientService : IAiClientService
             AnalysisId = analysisId,
             Status = AiAnalysisStatus.Completed,
             AnalysisType = AiAnalysisType.Anomaly,
-            Summary = $"Heuristic anomaly score: {fallbackScore:P0} ({fallbackRisk} Risk) based on discrepancy magnitude of {fallbackCurrency} {exception.DiscrepancyAmount:N2}.",
+            Summary = $"AI ML service is currently offline and will be back shortly. Standard reference while AI is offline: magnitude {fallbackCurrency} {exception.DiscrepancyAmount:N2} ({fallbackRisk} tier).",
             Evidence = new
             {
                 anomalyScore = fallbackScore,
                 riskLevel = fallbackRisk,
                 signals = (exception.DiscrepancyAmount > 5000) ? new[] { "CRITICAL_AMOUNT_DEVIATION" } : new[] { "MINOR_VARIANCE_TOLERANCE" },
-                algorithm = "Deterministic Heuristic Calibration",
-                modelVersion = "heuristic-fallback-v1"
+                algorithm = "AI Offline — Standard Magnitude Reference",
+                modelVersion = "ai-offline-standard-fallback",
+                advisoryOnly = true
             },
-            Recommendation = "Verify settlement advice against loan ledger.",
+            Recommendation = "Verify settlement advice against loan ledger while AI service reconnects.",
             AdvisoryOnly = true,
-            ModelName = "heuristic-fallback-v1",
+            ModelName = "ai-offline-standard-fallback",
             CreatedAt = DateTimeOffset.UtcNow
         };
     }
@@ -201,11 +202,11 @@ public class AiClientService : IAiClientService
             AnalysisId = analysisId,
             Status = AiAnalysisStatus.Completed,
             AnalysisType = AiAnalysisType.Explanation,
-            Summary = summary,
-            Evidence = new { internalAmount = exception.ExpectedAmount, externalAmount = exception.ActualAmount },
-            Recommendation = "Inspect counterparty settlement records and customer payment receipts.",
+            Summary = $"AI explanation service is currently offline and will be back shortly. Standard rule reference while AI is offline: {summary}",
+            Evidence = new { internalAmount = exception.ExpectedAmount, externalAmount = exception.ActualAmount, aiOffline = true },
+            Recommendation = "Inspect counterparty settlement records and customer payment receipts while AI reconnects.",
             AdvisoryOnly = true,
-            ModelName = "evidence-explainer-v1",
+            ModelName = "ai-offline-standard-fallback",
             CreatedAt = DateTimeOffset.UtcNow
         };
     }

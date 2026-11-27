@@ -33,7 +33,7 @@ public class OutboxConcurrencyStressTests
             {
                 if (!_schemaReady)
                 {
-                    ctx.Database.Migrate();
+                    ctx.Database.EnsureCreated();
                     _schemaReady = true;
                 }
             }

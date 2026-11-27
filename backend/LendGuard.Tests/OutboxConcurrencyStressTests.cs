@@ -16,6 +16,8 @@ namespace LendGuard.Tests;
 public class OutboxConcurrencyStressTests
 {
     private const string ConnectionString = "Host=localhost;Port=5433;Database=lendguard;Username=app;Password=lendguard_password;Maximum Pool Size=50;";
+    private static readonly SemaphoreSlim SchemaLock = new(1, 1);
+    private static bool _schemaReady;
 
     private LendGuardDbContext CreateRealDbContext()
     {
@@ -23,7 +25,24 @@ public class OutboxConcurrencyStressTests
             .UseNpgsql(ConnectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
-        return new LendGuardDbContext(options);
+        var ctx = new LendGuardDbContext(options);
+        if (!_schemaReady)
+        {
+            SchemaLock.Wait();
+            try
+            {
+                if (!_schemaReady)
+                {
+                    ctx.Database.Migrate();
+                    _schemaReady = true;
+                }
+            }
+            finally
+            {
+                SchemaLock.Release();
+            }
+        }
+        return ctx;
     }
 
     [Fact]

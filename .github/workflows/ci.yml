@@ -10,6 +10,20 @@ jobs:
   backend-validation:
     name: Backend Build, Test & Security Scan (.NET)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: lendguard_password
+          POSTGRES_DB: lendguard
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
